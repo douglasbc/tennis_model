@@ -1,0 +1,44 @@
+matches - drop year < 2011
+matches - drop registros com RET|W/O|DEF|nbsp|Def.
+matches - transformar rounds
+tournaments - drop davis/fed cup e exhibitions
+tournaments - drop carpet (ou renomear para indoor hard)
+stats - drop registros com campos nulos (pontos)
+inner join entre as 3 tabelas
+ordenar matches por data e round
+
+
+matches columns:
+  match_date
+  player_1
+  player_2
+  surface
+  round
+
+  p1_service_points_won,
+  p1_service_points_played,
+
+  p2_service_points_won,
+  p2_service_points_played,
+
+
+
+
+    round_numbers = {
+        'R128': 1,
+        'RR': 1,
+        'R64': 2,
+        'R32': 3,
+        'R16': 4,
+        'QF': 5,
+        'SF': 6,
+        'F': 7
+    }
+
+
+
+data['spw_winner'] = (data['w_1stWon'] + data['w_2ndWon']) / data['w_svpt']
+data['spw_loser'] = (data['l_1stWon'] + data['l_2ndWon']) / data['l_svpt']
+    
+# Compute the margin on the % of service points won
+margins = to_use['spw_winner'] - to_use['spw_loser']

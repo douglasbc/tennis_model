@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: wta_players
+    columns:
+      - name: player_id
+        tests:
+          - unique
+          - not_null
+      - name: player_name
+        tests:
+          - not_null
+      - name: country
+        tests:
+          - not_null
+      - name: is_left_handed
+        tests:
+          - not_null
+
+  - name: wta_tournaments
+    columns:
+      - name: tournament_id
+        tests:
+          - unique
+          - not_null
+      - name: tournament_date
+        tests:
+          - not_null
+      - name: tournament_name
+        tests:
+          - not_null
+      - name: country
+        tests:
+          - not_null
+      - name: surface
+        tests:
+          - not_null
+      - name: tournament_tier
+        tests:
+          - not_null
+         
+  - name: wta_entry
+    columns:
+      - name: player_id
+        tests:
+          - not_null
+      - name: tournament_id
+        tests:
+          - not_null
+      - name: entry_status
+        tests:
+          - accepted_values:
+              values: ['Alternate', 'ITF Ranking', 'Junior Exempt',
+              'Junior Reserved', 'Lucky Loser', 'Special Ranking',
+              'Special Exempt', 'Wild Card', 'Qualifier', 'G']

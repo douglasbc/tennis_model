@@ -1,0 +1,16 @@
+beautifulsoup4
+dbt-bigquery
+pandas
+pyarrow
+pytest
+tqdm
+numpy
+jax
+jaxlib
+scipy
+tqdm
+pandas
+scikit-learn
+matplotlib
+toolz
+# jupyter
