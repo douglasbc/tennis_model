@@ -120,21 +120,23 @@ def predict_test_matches(tour, lower_level, date_range, prefix, final_rating_dic
     else:
         table_id = f'tennis-358702.model_layer.{tour}_{prefix}_backtest_predictions'
 
-    schema = [
-        bigquery.SchemaField('match_date', 'DATETIME'),
-        bigquery.SchemaField('p1_name', 'STRING', mode='REQUIRED'),
-        bigquery.SchemaField('p2_name', 'STRING', mode='REQUIRED'),
-        bigquery.SchemaField('round', 'STRING'),
-        bigquery.SchemaField('surface', 'STRING', mode='REQUIRED'),
-        bigquery.SchemaField('p1_fair_pct', 'FLOAT64'),
-        bigquery.SchemaField('p2_fair_pct', 'FLOAT64'),
-        bigquery.SchemaField('p1_fair_odds', 'FLOAT64'),
-        bigquery.SchemaField('p2_fair_odds', 'FLOAT64'),
-        bigquery.SchemaField('p1_pct_diff', 'FLOAT64'),
-        bigquery.SchemaField('p2_pct_diff', 'FLOAT64'),
-    ]
+    # schema = [
+    #     bigquery.SchemaField('match_date', 'DATETIME'),
+    #     bigquery.SchemaField('p1_name', 'STRING', mode='REQUIRED'),
+    #     bigquery.SchemaField('p2_name', 'STRING', mode='REQUIRED'),
+    #     bigquery.SchemaField('round', 'STRING'),
+    #     bigquery.SchemaField('surface', 'STRING', mode='REQUIRED'),
+    #     bigquery.SchemaField('p1_fair_pct', 'FLOAT64'),
+    #     bigquery.SchemaField('p2_fair_pct', 'FLOAT64'),
+    #     bigquery.SchemaField('p1_fair_odds', 'FLOAT64'),
+    #     bigquery.SchemaField('p2_fair_odds', 'FLOAT64'),
+    #     bigquery.SchemaField('p1_pct_diff', 'FLOAT64'),
+    #     bigquery.SchemaField('p2_pct_diff', 'FLOAT64'),
+    # ]
 
-    job_config = bigquery.LoadJobConfig(schema=schema, write_disposition='WRITE_TRUNCATE')
+    # job_config = bigquery.LoadJobConfig(schema=schema, write_disposition='WRITE_TRUNCATE')
+
+    job_config = bigquery.LoadJobConfig(write_disposition='WRITE_TRUNCATE')
 
     job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
     job.result()
