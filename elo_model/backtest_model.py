@@ -125,7 +125,6 @@ def predict_test_matches(tour, lower_level, date_range, prefix, final_rating_dic
         bigquery.SchemaField('p1_name', 'STRING', mode='REQUIRED'),
         bigquery.SchemaField('p2_name', 'STRING', mode='REQUIRED'),
         bigquery.SchemaField('round', 'STRING'),
-        bigquery.SchemaField('tournament_name', 'STRING'),
         bigquery.SchemaField('surface', 'STRING', mode='REQUIRED'),
         bigquery.SchemaField('p1_fair_pct', 'FLOAT64'),
         bigquery.SchemaField('p2_fair_pct', 'FLOAT64'),
