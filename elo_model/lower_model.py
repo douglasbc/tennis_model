@@ -13,16 +13,19 @@ import pandas as pd
 
 client = bigquery_client()
 
-def get_input_data(tour):
+def get_input_data(tour, lower_level):
     if tour.lower() == 'atp':
         lower_tournaments = 'Future'
     if tour.lower() == 'wta':
-        lower_tournaments = '"Lower Level"'
+        lower_tournaments = 'Lower Level'
 
-    input_query = f'''
-                    SELECT * FROM `tennis-358702.model_layer.{tour}_input`
-                    WHERE tournament_level <> {lower_tournaments}
-                    '''
+    if lower_level:
+        input_query = f'SELECT * FROM `tennis-358702.model_layer.{tour}_input`'
+    else:
+        input_query = f'''
+                          SELECT * FROM `tennis-358702.model_layer.{tour}_input`
+                          WHERE tournament_level <> {lower_tournaments}
+                       '''
                
     df = client.query(input_query).to_dataframe()
 
@@ -32,9 +35,9 @@ def get_input_data(tour):
     return df
 
 
-def fit_model(tour):
+def fit_model(tour, lower_level):
 
-    df = get_input_data(tour)
+    df = get_input_data(tour, lower_level)
 
     params, opt_info = fit(df['p1_name'], df['p2_name'], df['surface'].values, 
                         margins=df['margins'].values, verbose=True)
@@ -45,33 +48,34 @@ def fit_model(tour):
     return params, final_rating_dict, mark_names
 
 
-def get_todays_matches(tour):
+def predict_match(p1, p2, surface):
+    return predict(final_rating_dict, params, p1, p2, surface, mark_names)
 
-    if tour.lower() == 'atp':
-        lower_tournaments = 'Future'
-    if tour.lower() == 'wta':
-        lower_tournaments = '"Lower Level"'
 
-    next_matches_query = f'''
-                        SELECT * FROM `tennis-358702.model_layer.{tour}_today`
-                        WHERE tournament_level <> {lower_tournaments}
-                    '''
+def get_todays_matches(tour, lower_level):
+
+    if lower_level:
+        next_matches_query = f'SELECT * FROM `tennis-358702.model_layer.{tour}_today`'
+    else:
+        next_matches_query = f'''
+                          SELECT * FROM `tennis-358702.model_layer.{tour}_today`
+                          WHERE tournament_level = 'Main Tour'
+                       '''
                
     df = client.query(next_matches_query).to_dataframe()
 
     df = df.sort_values(['tournament_name', 'round', 'match_date'])
+    # predictions_df = next_matches.copy()
     return df
 
 
-def predict_todays_matches(tour, final_rating_dict, params, mark_names):
+def predict_todays_matches(tour, lower_level):
 
-    params, final_rating_dict, mark_names = fit_model(tour)
-    df = get_todays_matches(tour)
+    params, final_rating_dict, mark_names = fit_model(tour, lower_level)
+    df = get_todays_matches(tour, lower_level)
     
     for index,row in df.iterrows():
-        match_prediction = predict(final_rating_dict, params, row['p1_name'],
-                                   row['p2_name'], row['surface'], mark_names
-                                   )     
+        match_prediction = predict_match(row['p1_name'], row['p2_name'], row['surface'])
         df.loc[index,'p1_probability'] = match_prediction
         df.loc[index,'p2_probability'] = 1-match_prediction
         df.loc[index,'p1_fair_odds'] = 1/match_prediction
@@ -100,12 +104,6 @@ def predict_todays_matches(tour, final_rating_dict, params, mark_names):
     print(f"Loaded table {table_id}")
 
 
-
-def main(tour):
-    params, final_rating_dict, mark_names = fit_model(tour)
-    predict_todays_matches(tour, final_rating_dict, params, mark_names)
-
-
 if __name__ == "__main__":
-    main('wta')
+    predict_todays_matches(tour='wta', lower_level=False)
     

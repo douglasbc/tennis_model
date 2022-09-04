@@ -53,10 +53,6 @@ def fit_model(tour, lower_level):
     return params, final_rating_dict, mark_names
 
 
-def predict_match(p1, p2, surface):
-    return predict(final_rating_dict, params, p1, p2, surface, mark_names)
-
-
 def get_test_matches(tour, lower_level, date_range):
 
     if lower_level:
