@@ -22,13 +22,13 @@ def get_input_data(tour, lower_level):
     if lower_level:
         input_query = f'''
                           SELECT * FROM `tennis-358702.model_layer.{tour}_backtest_input`
-                          WHERE match_date <= '2021-12-31'
+                          WHERE match_date <= '2022-03-31'
                        '''
     else:
         input_query = f'''
                           SELECT * FROM `tennis-358702.model_layer.{tour}_backtest_input`
                           WHERE
-                            match_date <= '2021-12-31'
+                            match_date <= '2022-03-31'
                             and tournament_level <> {lower_level}
                        '''
                
@@ -64,11 +64,11 @@ def get_test_matches(tour, lower_level, date_range):
                           with players_fitted as (
                             select distinct p1_name as player
                             from `tennis-358702.model_layer.{tour}_backtest_input`
-                            where match_date <= '2021-12-31'
+                            where match_date <= '2022-03-31'
                             union all
                             select distinct p2_name as player
                             from `tennis-358702.model_layer.{tour}_backtest_input`
-                            where match_date <= '2021-12-31'
+                            where match_date <= '2022-03-31'
                           )
                           SELECT * FROM `tennis-358702.model_layer.{tour}_backtest_input`
                           WHERE
@@ -81,11 +81,11 @@ def get_test_matches(tour, lower_level, date_range):
                           with players_fitted as (
                             select distinct p1_name as player
                             from `tennis-358702.model_layer.{tour}_backtest_input`
-                            where match_date <= '2021-12-31'
+                            where match_date <= '2022-03-31'
                             union all
                             select distinct p2_name as player
                             from `tennis-358702.model_layer.{tour}_backtest_input`
-                            where match_date <= '2021-12-31'
+                            where match_date <= '2022-03-31'
                           )
                           SELECT * FROM `tennis-358702.model_layer.{tour}_backtest_input`
                           WHERE
@@ -113,7 +113,7 @@ def predict_test_matches(tour, lower_level, date_range, prefix, final_rating_dic
         df.loc[index,'p1_fair_odds'] = 1/match_prediction
         df.loc[index,'p2_fair_odds'] = 1/(1-match_prediction)
         df.loc[index,'p1_pct_diff'] = match_prediction - df.loc[index,'p1_odds_pct']
-        df.loc[index,'p2_pct_diff'] = match_prediction - df.loc[index,'p2_odds_pct'] 
+        df.loc[index,'p2_pct_diff'] = 1-match_prediction - df.loc[index,'p2_odds_pct'] 
 
     if lower_level:
         table_id = f'tennis-358702.model_layer.{tour}_{prefix}_lower_backtest_predictions'
@@ -121,7 +121,7 @@ def predict_test_matches(tour, lower_level, date_range, prefix, final_rating_dic
         table_id = f'tennis-358702.model_layer.{tour}_{prefix}_backtest_predictions'
 
     # schema = [
-    #     bigquery.SchemaField('match_date', 'DATETIME'),
+    #     bigquery.SchemaField('match_date', 'DATE'),
     #     bigquery.SchemaField('p1_name', 'STRING', mode='REQUIRED'),
     #     bigquery.SchemaField('p2_name', 'STRING', mode='REQUIRED'),
     #     bigquery.SchemaField('round', 'STRING'),
@@ -148,11 +148,8 @@ def main(tour, lower_level):
 
     params, final_rating_dict, mark_names = fit_model(tour, lower_level)
 
-    q1_range = "match_date >= '2022-01-01' and match_date <= '2022-03-31'" 
-    year_range = "match_date >= '2022-01-01'" 
-
-    predict_test_matches(tour, lower_level, q1_range, 'q1', final_rating_dict, params, mark_names)
-    predict_test_matches(tour, lower_level, year_range, 'year', final_rating_dict, params, mark_names)
+    quarter_range = "match_date >= '2022-04-01' and match_date <= '2022-06-30'" 
+    predict_test_matches(tour, lower_level, quarter_range, 'q2', final_rating_dict, params, mark_names)
 
 
 if __name__ == "__main__":
