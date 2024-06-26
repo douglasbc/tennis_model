@@ -39,17 +39,17 @@ models:
         tests:
           - not_null
          
-  - name: wta_entry
-    columns:
-      - name: player_id
-        tests:
-          - not_null
-      - name: tournament_id
-        tests:
-          - not_null
-      - name: entry_status
-        tests:
-          - accepted_values:
-              values: ['Alternate', 'ITF Ranking', 'Junior Exempt',
-              'Junior Reserved', 'Lucky Loser', 'Special Ranking',
-              'Special Exempt', 'Wild Card', 'Qualifier', 'G']
+  # - name: wta_entry
+  #   columns:
+  #     - name: player_id
+  #       tests:
+  #         - not_null
+  #     - name: tournament_id
+  #       tests:
+  #         - not_null
+  #     - name: entry_status
+  #       tests:
+  #         - accepted_values:
+  #             values: ['Alternate', 'ITF Ranking', 'Junior Exempt',
+  #             'Junior Reserved', 'Lucky Loser', 'Special Ranking',
+  #             'Special Exempt', 'Wild Card', 'Qualifier', 'G']

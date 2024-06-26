@@ -12,8 +12,33 @@ with atp_matches as (
   select * from {{ ref('atp_matches') }}
 ),
 
-final as (    
+filtered_matches as (
+  select * from atp_matches
+  where
+    regexp_extract(result, r'([a-zA-Z]+)') is null
+    -- and tournament_tier not in ('David Cup', 'Laver Cup', 'Next Gen ATP Finals')
+    and tournament_tier not in ('Laver Cup', 'Next Gen ATP Finals')
+    and p1_service_points_won > 0
+    and p1_service_points_played > 0
+    and p2_service_points_won > 0
+    and p2_service_points_played > 0
+),
 
+not_newbies as (
+  select
+    player,
+    count(1) as matches_count
+  from 
+    (select p1_name as player
+    from filtered_matches
+    union all
+    select p2_name as player
+    from filtered_matches)
+  group by player
+  having matches_count >= 10
+),
+
+final as (
   select
     match_date,
     p1_name,
@@ -22,13 +47,10 @@ final as (
       when surface = 'Carpet' then 'Indoor Hard'
       else surface
     end as surface,
+    tournament_tier,
     case
-      when tournament_tier in ('ATP 250', 'ATP 500', 'ATP Cup', 'ATP Finals', 'Masters 1000', 'Grand Slam')
-        then 'Main Tour'
-      else tournament_tier
-    end as tournament_level,
-    case
-      when round in ('Qualifying First Round',
+      when round in ('Pre Qualifying',
+                     'Qualifying First Round',
                      'Qualifying Second Round',
                      'Qualifying Final Round')
         then 1
@@ -42,16 +64,13 @@ final as (
     end as round,
     (p1_service_points_won/p1_service_points_played)
       - (p2_service_points_won/ p2_service_points_played)
-        as margins
-  from atp_matches
+        as margins,
+    p1_win_match_odds as p1_odds,
+    p2_win_match_odds as p2_odds
+  from filtered_matches
   where
-    regexp_extract(result, r'([a-zA-Z]+)') is null
-    -- and tournament_tier not in ('Future', 'David Cup', 'Laver Cup', 'Next Gen ATP Finals')
-    and tournament_tier not in ('David Cup', 'Laver Cup', 'Next Gen ATP Finals')
-    and p1_service_points_won > 0
-    and p1_service_points_played > 0
-    and p2_service_points_won > 0
-    and p2_service_points_played > 0
+    p1_name in (select player from not_newbies)
+    and p2_name in (select player from not_newbies)
 )
 
 select * from final

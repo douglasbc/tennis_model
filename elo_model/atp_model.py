@@ -121,5 +121,5 @@ def main(tour):
 
 
 if __name__ == "__main__":
-    main('wta')
+    main('atp')
     

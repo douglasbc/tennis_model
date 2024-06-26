@@ -9,7 +9,7 @@ with players_wta as (
 ),
 
 categories_wta as (
-  select * from {{ source('raw_layer', 'categories_wta')}}
+  select * from {{ source('raw_layer', 'categories_wta') }}
 ),
 
 country_codes as (

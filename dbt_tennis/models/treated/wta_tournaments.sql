@@ -6,7 +6,7 @@
 with tournaments as (
   select * from {{ source('raw_layer', 'tournaments_wta') }}
   where
-    extract(year from tournament_date) >= 2012
+    extract(year from tournament_date) >= 2015
     and tournament_level <> 6
 
 ),

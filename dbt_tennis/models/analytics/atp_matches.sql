@@ -53,7 +53,10 @@ final as (
       t.tournament_id,
       t.tournament_name,
       t.country as tournament_country,
-      t.surface,
+      case
+        when t.surface = 'Carpet' then 'Indoor Hard'
+        else t.surface
+      end as surface,
       t.tournament_tier,
       p1.country as p1_country,
       p2.country as p2_country,
@@ -100,7 +103,7 @@ final as (
       left join rankings_atp as r2 on m.player_2_id = r2.player_id
         and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
       left join rounds as r on m.round_id = r.round_id
-    where extract(year from m.match_date) >= 2011
+    where extract(year from m.match_date) >= 2015
 )
 
 select * from final

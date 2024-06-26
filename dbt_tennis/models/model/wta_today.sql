@@ -26,14 +26,11 @@ final as (
       p2.player_name as p2_name,
       r.round,
       t.tournament_name,
-      t.surface,
       case
-        when t.tournament_tier in ('WTA 250', 'WTA 500', 'WTA 1000', 'Grand Slam')
-          then 'Main Tour'
-        when t.tournament_tier in ('10k', '15k', '25k')
-          then 'Lower Level'    
-        else 'Second Level'
-      end as tournament_level
+        when t.surface = 'Carpet' then 'Indoor Hard'
+        else t.surface
+      end as surface,
+      t.tournament_tier
     from today_wta as td
       inner join wta_tournaments as t on td.tournament_id = t.tournament_id
       inner join wta_players as p1 on td.player_1_id = p1.player_id
@@ -43,7 +40,6 @@ final as (
       td.player_1_id not in (3699, 3700)
       and td.player_2_id not in (3699, 3700)
       and td.result is null
-      -- and t.tournament_tier in ('WTA 125', 'WTA 250', 'WTA 500', 'WTA 1000', 'Grand Slam')
 )
 
 select * from final

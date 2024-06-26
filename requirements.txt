@@ -1,16 +1,13 @@
-beautifulsoup4
 dbt-bigquery
+jaxlib
+jax
+lxml
+numpy
 pandas
 pyarrow
-pytest
-tqdm
-numpy
-jax
-jaxlib
 scipy
-tqdm
-pandas
 scikit-learn
-matplotlib
 toolz
-# jupyter
+tqdm
+db-dtypes
+pretty_html_table

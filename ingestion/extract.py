@@ -5,7 +5,9 @@ import subprocess
 
 BACKUP_PATH = os.path.join('data', 'backup')
 CSV_PATH = os.path.join('data', 'csv')
-MDB_PATH = os.path.join('data', 'OnCourt', 'OnCourt.mdb')
+# MDB_PATH = os.path.join('data', 'OnCourt', 'OnCourt.mdb')
+MDB_PATH = os.path.join('~', '.wine32', 'drive_c', 'Program\ Files',
+                        'OnCourt', 'OnCourt.mdb')
 
 
 def backup_csv():

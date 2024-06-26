@@ -201,7 +201,14 @@ def load_matches(incremental=False):
         bigquery.SchemaField('match_date', 'DATE')
         ]
     matches_atp = TennisTable('games', schema, rename, 'atp', incremental)
+    # filter matches since 2015
+    matches_atp.df = matches_atp.df[505609:]
+
     matches_wta = TennisTable('games', schema, rename, 'wta', incremental)
+    # filter matches since 2015
+    matches_wta.df = matches_wta.df[319104:]
+
+
 
     if incremental:
         write_disposition = 'WRITE_APPEND'
@@ -253,7 +260,10 @@ def load_odds(incremental=False):
         bigquery.SchemaField('p2_3_0_sets_odds', 'FLOAT64')      
 ]
     odds_atp = TennisTable('odds', schema, rename, 'atp', incremental)
+    odds_atp.df = odds_atp.df[116833:]
+
     odds_wta = TennisTable('odds', schema, rename, 'wta', incremental)
+    odds_wta.df = odds_wta.df[81560:]
 
     if incremental:
         write_disposition = 'WRITE_APPEND'
@@ -405,7 +415,10 @@ def load_stats(incremental=False):
         bigquery.SchemaField('match_duration', 'STRING'),     
 ]
     stats_atp = TennisTable('stat', schema, rename, 'atp', incremental)
+    stats_atp.df = stats_atp.df[76351:]
+
     stats_wta = TennisTable('stat', schema, rename, 'wta', incremental)
+    stats_wta.df = stats_wta.df[39631:]
 
     if incremental:
         write_disposition = 'WRITE_APPEND'
@@ -470,7 +483,10 @@ def load_tournaments(incremental=False):
         bigquery.SchemaField('tournament_tier', 'STRING'),
 ]
     tournaments_atp = TennisTable('tours', schema, rename, 'atp', incremental)
+    tournaments_atp.df = tournaments_atp.df[11342:]
+
     tournaments_wta = TennisTable('tours', schema, rename, 'wta', incremental)
+    tournaments_wta.df = tournaments_wta.df[6485:]
 
     if incremental:
         write_disposition = 'WRITE_APPEND'
@@ -497,13 +513,13 @@ def increment_to_bq():
 def full_refresh_to_bq():    
 
     load_categories()
-   # load_courts()
+    # load_courts()
     load_matches()
     load_odds()
     load_players()
-    load_rankings()
-   # load_rounds()
-    load_seeds()
+    # load_rankings()
+    # load_rounds()
+    # load_seeds()
     load_stats()
     load_today()
     load_tournaments()

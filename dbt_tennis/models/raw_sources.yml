@@ -5,24 +5,26 @@ sources:
     tables: 
       - name: categories_wta
       - name: matches_wta
-      - name: odds_wta
+      # - name: odds_wta
       - name: players_wta
-      - name: rankings_wta
-      - name: seeds_wta
+      # - name: rankings_wta
+      # - name: seeds_wta
       - name: stats_wta
       - name: today_wta
       - name: tournaments_wta
       - name: categories_atp
       - name: matches_atp
-      - name: odds_atp
+      # - name: odds_atp
       - name: players_atp
-      - name: rankings_atp
-      - name: seeds_atp
+      # - name: rankings_atp
+      # - name: seeds_atp
       - name: stats_atp
       - name: today_atp
       - name: tournaments_atp
       - name: country_codes
       - name: courts
       - name: rounds
-
-
+      - name: pinnacle_odds
+      - name: fix_player_names
+      - name: atp_predictions
+      - name: wta_predictions

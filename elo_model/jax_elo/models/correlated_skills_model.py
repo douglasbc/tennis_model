@@ -144,10 +144,10 @@ def calculate_ratings(parameters, winners, losers, marks, margins=None):
         for player_name, rating_array in final_ratings.items()
     }
 
-    return results, final_ratings, mark_names
+    return final_ratings, mark_names
 
 
-def predict(ratings, parameters, player, opponent, mark, mark_names):
+def predict_match(ratings, parameters, player, opponent, mark, mark_names):
     """Predicts the win probability of a contest between a player and an
     opponent.
 
