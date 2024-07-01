@@ -1,13 +1,8 @@
+beautifulsoup4
 dbt-bigquery
-jaxlib
 jax
-lxml
 numpy
 pandas
-pyarrow
-scipy
-scikit-learn
-toolz
-tqdm
-db-dtypes
 pretty_html_table
+scipy
+tqdm
