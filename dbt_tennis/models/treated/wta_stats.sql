@@ -3,7 +3,9 @@
     schema = 'treated_layer'
 )}}
 
-with stats as (
+with 
+
+stats as (
   select * from {{ source('raw_layer', 'stats_wta') }}
 ),
 

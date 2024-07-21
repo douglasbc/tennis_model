@@ -3,7 +3,9 @@
     schema = 'treated_layer'
 )}}
 
-with seeds as (
+with 
+
+seeds as (
   select * from {{ source('raw_layer', 'seeds_atp') }}
 ),
 
@@ -12,7 +14,7 @@ final as (
       player_id,
       tournament_id,
       case
-        when REGEXP_EXTRACT(seeding, r'([a-zA-Z]+)') in ('A', 'ALT', 'Alt') 
+        when REGEXP_EXTRACT(seeding, r'([a-zA-Z]+)') in ('A', 'AL', 'ALT', 'Alt') 
         then 'Alternate'
         when REGEXP_EXTRACT(seeding, r'([a-zA-Z]+)') in ('IR', 'ITF', 'P') 
         then 'ITF Ranking'

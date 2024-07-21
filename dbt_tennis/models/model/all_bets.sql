@@ -3,7 +3,9 @@
     schema = 'model_layer',
 )}}
 
-with pinnacle_odds as (
+with 
+
+pinnacle_odds as (
   select * from {{ source('raw_layer', 'pinnacle_odds') }}
 ),
 

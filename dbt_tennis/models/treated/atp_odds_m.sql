@@ -3,7 +3,9 @@
     schema = 'treated_layer'
 )}}
 
-with odds as (
+with 
+
+odds as (
   select * from {{ source('raw_layer', 'odds_atp') }}
 ),
 

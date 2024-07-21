@@ -3,7 +3,9 @@
     schema = 'model_layer',
 )}}
 
-with pinnacle_odds as (
+with 
+
+pinnacle_odds as (
   select * from {{ source('raw_layer', 'pinnacle_odds') }}
 ),
 
@@ -37,8 +39,8 @@ pinnacle as (
   select
     event_id,
     tournament_round,
-    match_start_at,
     -- datetime(match_start_at, 'America/Sao_Paulo') as match_start_at,
+    datetime_sub(match_start_at, interval 3 hour) as match_start_at,
     coalesce(f1.oncourt_name, p1_name) as p1_name,
     coalesce(f2.oncourt_name, p2_name) as p2_name,
     p1_pinnacle_odds,

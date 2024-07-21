@@ -8,7 +8,9 @@
     }
 )}}
 
-with matches_wta as (
+with
+
+matches_wta as (
   select * from {{ source('raw_layer', 'matches_wta') }}
 ),
 

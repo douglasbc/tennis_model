@@ -1,4 +1,6 @@
-with players as (
+with 
+
+players as (
   select
     player_name
   from `tennis-358702.treated_layer.wta_players`

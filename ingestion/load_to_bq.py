@@ -6,9 +6,11 @@ from google.oauth2 import service_account
 import pandas as pd
 
 from bq_client import bigquery_client
+from scrape_mcp_to_df import scrape_mcp
 
 
 client = bigquery_client()
+df_dict = scrape_mcp()
 
 
 class TennisTable():
@@ -18,16 +20,34 @@ class TennisTable():
     DATASET = 'raw_layer'
     PROJECT_ID = 'tennis-358702'
 
-    csv_tables = [
+    table_names = [
         'categories', 'courts', 'games', 'odds',
         'players', 'ratings', 'rounds', 'seed',
-        'stat', 'today', 'tours'
+        'stat', 'today', 'tours',
+        'atp_last_52_serve',
+        'atp_last_52_return',
+        'atp_last_52_rally',
+        'atp_last_52_tactics',
+        'atp_career_serve',
+        'atp_career_return',
+        'atp_career_rally',
+        'atp_career_tactics',
+        'wta_last_52_serve',
+        'wta_last_52_return',
+        'wta_last_52_rally',
+        'wta_last_52_tactics',
+        'wta_career_serve',
+        'wta_career_return',
+        'wta_career_rally',
+        'wta_career_tactics'
         ]
 
     def __init__(self, name: str, schema: List[bigquery.SchemaField],
-            rename: List[str], tour=None, incremental=False
+            rename: List[str], tour=None, mcp=None, incremental=False
             ):
-        if tour:
+        if mcp:
+            self.df = df_dict[name]
+        elif tour:
             self.df = pd.read_csv(os.path.join(TennisTable.CSV_PATH, f'{name}_{tour}.csv'))
         else:
             self.df = pd.read_csv(os.path.join(TennisTable.CSV_PATH, f'{name}.csv'))
@@ -45,7 +65,7 @@ class TennisTable():
 
     @name.setter
     def name(self, name):
-        if name not in TennisTable.csv_tables:
+        if name not in TennisTable.table_names:
             raise ValueError('''Invalid name. Valid names are:
                             categories, courts, games, odds,
                             players, ratings, rounds, seed,
@@ -500,6 +520,183 @@ def load_tournaments(incremental=False):
         table.load_to_bq('tournaments', write_disposition, partition_field='tournament_date')
 
 
+def load_match_charting_project():
+ 
+    rename_serve_atp = ['player_name', 'matches_count', 'unreturned_pct',
+                            'sp_won_serve_or_second_shot_pct', 'sp_won_when_returned_pct',
+                            'serve_impact', 'first_serve_unreturned_pct', 'first_sp_won_serve_or_second_shot_pct',
+                            'first_sp_won_when_returned_pct', 'first_serve_impact', 'wide_deuce_court_first_serve_pct',
+                            'wide_ad_court_first_serve_pct', 'wide_ad_court_break_point_first_serve_pct',
+                            'second_serve_unreturned_pct', 'second_sp_won_serve_or_second_shot_pct',
+                            'second_sp_won_when_returned_pct', 'wide_deuce_court_second_serve_pct',
+                            'wide_ad_court_second_serve_pct', 'wide_ad_court_break_point_second_serve_pct',
+                            'second_serve_agression_score'                        
+                            ]
+    schema_serve_atp = [
+        bigquery.SchemaField('player_name', 'STRING', mode='REQUIRED'),
+        bigquery.SchemaField('matches_count', 'INT64'),
+        bigquery.SchemaField('unreturned_pct', 'STRING'),
+        bigquery.SchemaField('sp_won_serve_or_second_shot_pct', 'STRING'),
+        bigquery.SchemaField('sp_won_when_returned_pct', 'STRING'),
+        bigquery.SchemaField('serve_impact', 'STRING'),
+        bigquery.SchemaField('first_serve_unreturned_pct', 'STRING'),
+        bigquery.SchemaField('first_sp_won_serve_or_second_shot_pct', 'STRING'),
+        bigquery.SchemaField('first_sp_won_when_returned_pct', 'STRING'),
+        bigquery.SchemaField('first_serve_impact', 'STRING'),
+        bigquery.SchemaField('wide_deuce_court_first_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_first_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_break_point_first_serve_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_unreturned_pct', 'STRING'),
+        bigquery.SchemaField('second_sp_won_serve_or_second_shot_pct', 'STRING'),
+        bigquery.SchemaField('second_sp_won_when_returned_pct', 'STRING'),
+        bigquery.SchemaField('wide_deuce_court_second_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_second_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_break_point_second_serve_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_agression_score', 'INT64')
+]
+    rename_serve_wta = ['player_name', 'matches_count', 'unreturned_pct',
+                            'sp_won_serve_or_second_shot_pct', 'sp_won_when_returned_pct',
+                            'first_serve_unreturned_pct', 'first_sp_won_serve_or_second_shot_pct',
+                            'first_sp_won_when_returned_pct', 'wide_deuce_court_first_serve_pct',
+                            'wide_ad_court_first_serve_pct', 'wide_ad_court_break_point_first_serve_pct',
+                            'second_serve_unreturned_pct', 'second_sp_won_serve_or_second_shot_pct',
+                            'second_sp_won_when_returned_pct', 'wide_deuce_court_second_serve_pct',
+                            'wide_ad_court_second_serve_pct', 'wide_ad_court_break_point_second_serve_pct',
+                            'second_serve_agression_score'                        
+                            ]
+    schema_serve_wta = [
+        bigquery.SchemaField('player_name', 'STRING', mode='REQUIRED'),
+        bigquery.SchemaField('matches_count', 'INT64'),
+        bigquery.SchemaField('unreturned_pct', 'STRING'),
+        bigquery.SchemaField('sp_won_serve_or_second_shot_pct', 'STRING'),
+        bigquery.SchemaField('sp_won_when_returned_pct', 'STRING'),
+        bigquery.SchemaField('first_serve_unreturned_pct', 'STRING'),
+        bigquery.SchemaField('first_sp_won_serve_or_second_shot_pct', 'STRING'),
+        bigquery.SchemaField('first_sp_won_when_returned_pct', 'STRING'),
+        bigquery.SchemaField('wide_deuce_court_first_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_first_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_break_point_first_serve_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_unreturned_pct', 'STRING'),
+        bigquery.SchemaField('second_sp_won_serve_or_second_shot_pct', 'STRING'),
+        bigquery.SchemaField('second_sp_won_when_returned_pct', 'STRING'),
+        bigquery.SchemaField('wide_deuce_court_second_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_second_serve_pct', 'STRING'),
+        bigquery.SchemaField('wide_ad_court_break_point_second_serve_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_agression_score', 'INT64')
+]
+    
+    rename_return = ['player_name', 'matches_count', 'returned_pct',
+                            'points_won_returned_pct', 'winners_pct',
+                            'fh_winners_pct', 'return_depth_index',
+                            'slice_returns_pct', 'first_serve_returned_pct',
+                            'first_serve_points_won_returned_pct', 'first_serve_winners_pct',
+                            'first_serve_return_depth_index', 'first_serve_slice_returns_pct',
+                            'second_serve_returned_pct', 'second_serve_points_won_returned_pct',
+                            'second_serve_winners_pct', 'second_serve_return_depth_index',
+                            'second_serve_slice_returns_pct'
+                            ]
+
+    schema_return = [
+        bigquery.SchemaField('player_name', 'STRING', mode='REQUIRED'),
+        bigquery.SchemaField('matches_count', 'INT64'),
+        bigquery.SchemaField('returned_pct', 'STRING'),
+        bigquery.SchemaField('points_won_returned_pct', 'STRING'),
+        bigquery.SchemaField('winners_pct', 'STRING'),
+        bigquery.SchemaField('fh_winners_pct', 'STRING'),
+        bigquery.SchemaField('return_depth_index', 'FLOAT64'),
+        bigquery.SchemaField('slice_returns_pct', 'STRING'),
+        bigquery.SchemaField('first_serve_returned_pct', 'STRING'),
+        bigquery.SchemaField('first_serve_points_won_returned_pct', 'STRING'),
+        bigquery.SchemaField('first_serve_winners_pct', 'STRING'),
+        bigquery.SchemaField('first_serve_return_depth_index', 'FLOAT64'),
+        bigquery.SchemaField('first_serve_slice_returns_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_returned_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_points_won_returned_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_winners_pct', 'STRING'),
+        bigquery.SchemaField('second_serve_return_depth_index', 'FLOAT64'),
+        bigquery.SchemaField('second_serve_slice_returns_pct', 'STRING')
+]
+    
+    rename_rally = ['player_name', 'matches_count',
+                            'avg_rally_lenght', 'avg_rally_lenght_serve',
+                            'avg_rally_lenght_return', 'points_btw_1_3_shots_win_pct',
+                            'points_btw_4_6_shots_win_pct', 'points_btw_7_9_shots_win_pct',
+                            'points_10_plus_shots_win_pct', 'forehands_per_groundstroke',
+                            'sliced_per_backhand_groundstroke', 'forehand_potency_per_100_forehands',
+                            'forehand_potency_per_match', 'backhand_potency_per_match',
+                            'backhand_potency_per_100_backhands'
+                            ]
+
+    schema_rally = [
+        bigquery.SchemaField('player_name', 'STRING', mode='REQUIRED'),
+        bigquery.SchemaField('matches_count', 'INT64'),
+        bigquery.SchemaField('avg_rally_lenght', 'FLOAT64'),
+        bigquery.SchemaField('avg_rally_lenght_serve', 'FLOAT64'),
+        bigquery.SchemaField('avg_rally_lenght_return', 'FLOAT64'),
+        bigquery.SchemaField('points_btw_1_3_shots_win_pct', 'STRING'),
+        bigquery.SchemaField('points_btw_4_6_shots_win_pct', 'STRING'),
+        bigquery.SchemaField('points_btw_7_9_shots_win_pct', 'STRING'),
+        bigquery.SchemaField('points_10_plus_shots_win_pct', 'STRING'),
+        bigquery.SchemaField('forehands_per_groundstroke', 'STRING'),
+        bigquery.SchemaField('sliced_per_backhand_groundstroke', 'STRING'),
+        bigquery.SchemaField('forehand_potency_per_100_forehands', 'FLOAT64'),
+        bigquery.SchemaField('forehand_potency_per_match', 'FLOAT64'),
+        bigquery.SchemaField('backhand_potency_per_match', 'FLOAT64'),
+        bigquery.SchemaField('backhand_potency_per_100_backhands', 'FLOAT64')
+]    
+
+    rename_tactics = ['player_name', 'matches_count',
+                            'serve_and_volley_pct', 'points_won_per_serve_and_volley',
+                            'net_points_pct', 'points_won_per_net_point',
+                            'winners_per_forehand', 'winners_per_forehand_down_the_line',
+                            'winners_per_forehand_inside_out', 'winners_per_backhand',
+                            'winners_per_backhand_down_the_line', 'dropshot_pct',
+                            'points_won_per_dropshot', 'rally_agression_score',
+                            'return_agression_score'
+                            ]
+
+    schema_tactics = [
+        bigquery.SchemaField('player_name', 'STRING', mode='REQUIRED'),
+        bigquery.SchemaField('matches_count', 'INT64'),
+        bigquery.SchemaField('serve_and_volley_pct', 'STRING'),
+        bigquery.SchemaField('points_won_per_serve_and_volley', 'STRING'),
+        bigquery.SchemaField('net_points_pct', 'STRING'),
+        bigquery.SchemaField('points_won_per_net_point', 'STRING'),
+        bigquery.SchemaField('winners_per_forehand', 'STRING'),
+        bigquery.SchemaField('winners_per_forehand_down_the_line', 'STRING'),
+        bigquery.SchemaField('winners_per_forehand_inside_out', 'STRING'),
+        bigquery.SchemaField('winners_per_backhand', 'STRING'),
+        bigquery.SchemaField('winners_per_backhand_down_the_line', 'STRING'),
+        bigquery.SchemaField('dropshot_pct', 'STRING'),
+        bigquery.SchemaField('points_won_per_dropshot', 'STRING'),
+        bigquery.SchemaField('rally_agression_score', 'INT64'),
+        bigquery.SchemaField('return_agression_score', 'INT64')
+]
+    
+    table_dict = {
+        'atp_last_52_serve' : TennisTable('atp_last_52_serve', schema_serve_atp, rename_serve_atp, mcp='mcp'),
+        'atp_last_52_return' : TennisTable('atp_last_52_return', schema_return, rename_return, mcp='mcp'),
+        'atp_last_52_rally' : TennisTable('atp_last_52_rally', schema_rally, rename_rally, mcp='mcp'),
+        'atp_last_52_tactics' : TennisTable('atp_last_52_tactics', schema_tactics, rename_tactics, mcp='mcp'),
+        'atp_career_serve' : TennisTable('atp_career_serve', schema_serve_atp, rename_serve_atp, mcp='mcp'),
+        'atp_career_return' : TennisTable('atp_career_return', schema_return, rename_return, mcp='mcp'),
+        'atp_career_rally' : TennisTable('atp_career_rally', schema_rally, rename_rally, mcp='mcp'),
+        'atp_career_tactics' : TennisTable('atp_career_tactics', schema_tactics, rename_tactics, mcp='mcp'),
+        'wta_last_52_serve' : TennisTable('wta_last_52_serve', schema_serve_wta, rename_serve_wta, mcp='mcp'),
+        'wta_last_52_return' : TennisTable('wta_last_52_return', schema_return, rename_return, mcp='mcp'),
+        'wta_last_52_rally' : TennisTable('wta_last_52_rally', schema_rally, rename_rally, mcp='mcp'),
+        'wta_last_52_tactics' : TennisTable('wta_last_52_tactics', schema_tactics, rename_tactics, mcp='mcp'),
+        'wta_career_serve' : TennisTable('wta_career_serve', schema_serve_wta, rename_serve_wta, mcp='mcp'),
+        'wta_career_return' : TennisTable('wta_career_return', schema_return, rename_return, mcp='mcp'),
+        'wta_career_rally' : TennisTable('wta_career_rally', schema_rally, rename_rally, mcp='mcp'),
+        'wta_career_tactics' : TennisTable('wta_career_tactics', schema_tactics, rename_tactics, mcp='mcp')
+    }
+
+    for key, value in table_dict.items():
+        value.rename_columns()
+        value.load_to_bq(key)
+
+
 def increment_to_bq():    
 
     load_matches(incremental = True)
@@ -523,3 +720,4 @@ def full_refresh_to_bq():
     load_stats()
     load_today()
     load_tournaments()
+    load_match_charting_project()

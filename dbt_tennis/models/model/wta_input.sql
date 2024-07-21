@@ -8,12 +8,14 @@
     }
 )}}
 
-with wta_matches as (
-  select * from {{ ref('wta_matches') }}
+with 
+
+matches_wta as (
+  select * from {{ ref('matches_wta') }}
 ),
 
 filtered_matches as (
-  select * from wta_matches
+  select * from matches_wta
   where
     regexp_extract(result, r'([a-zA-Z]+)') is null
     and p1_service_points_won > 0

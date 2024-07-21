@@ -1,4 +1,3 @@
-import pandas as pd
 from bq_client import bigquery_client
 
 
@@ -6,7 +5,9 @@ client = bigquery_client()
 
 def get_bets_data():
     query = '''
-    with players as (
+with 
+
+players as (
   select
     player_name
   from `tennis-358702.treated_layer.wta_players`

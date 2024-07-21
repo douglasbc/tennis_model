@@ -3,7 +3,9 @@
     schema = 'treated_layer'
 )}}
 
-with tournaments_atp as (
+with 
+
+tournaments_atp as (
   select * from {{ source('raw_layer', 'tournaments_atp') }}
   where
     extract(year from tournament_date) >= 2015

@@ -8,12 +8,14 @@
     }
 )}}
 
-with atp_matches as (
-  select * from {{ ref('atp_matches') }}
+with 
+
+matches_atp as (
+  select * from {{ ref('matches_atp') }}
 ),
 
 filtered_matches as (
-  select * from atp_matches
+  select * from matches_atp
   where
     regexp_extract(result, r'([a-zA-Z]+)') is null
     -- and tournament_tier not in ('David Cup', 'Laver Cup', 'Next Gen ATP Finals')

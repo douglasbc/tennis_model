@@ -3,7 +3,9 @@
     schema = 'model_layer',
 )}}
 
-with wta_input as (
+with 
+
+wta_input as (
   select * from {{ ref('wta_input') }}
 ),
 

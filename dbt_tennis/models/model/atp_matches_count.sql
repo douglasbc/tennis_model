@@ -3,7 +3,9 @@
     schema = 'model_layer',
 )}}
 
-with atp_input as (
+with 
+
+atp_input as (
   select * from {{ ref('atp_input') }}
 ),
 

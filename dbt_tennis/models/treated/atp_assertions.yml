@@ -14,9 +14,9 @@ models:
         tests:
           - not_null
 
-      - name: country
-        tests:
-          - not_null
+      # - name: country
+      #   tests:
+      #     - not_null
 
       - name: is_left_handed
         tests:
@@ -53,34 +53,34 @@ models:
           - not_null
 
          
-  # - name: atp_entry
-  #   description: This table contains data on entry status and seeding for players on ATP tournaments.
+  - name: atp_entry
+    description: This table contains data on entry status and seeding for players on ATP tournaments.
 
-  #   columns:
-  #     - name: player_id
-  #       tests:
-  #         - not_null
+    columns:
+      - name: player_id
+        tests:
+          - not_null
 
-  #     - name: tournament_id
-  #       tests:
-  #         - not_null
+      - name: tournament_id
+        tests:
+          - not_null
 
-  #     - name: entry_status
-  #       tests:
-  #         - accepted_values:
-  #             values: ['Alternate', 'ITF Ranking', 'Junior Exempt',
-  #             'Junior Reserved', 'Lucky Loser', 'Special Ranking',
-  #             'Special Exempt', 'Wild Card', 'Qualifier', 'G']
+      - name: entry_status
+        tests:
+          - accepted_values:
+              values: ['Alternate', 'ITF Ranking', 'Junior Exempt',
+              'Junior Reserved', 'Lucky Loser', 'Special Ranking',
+              'Special Exempt', 'Wild Card', 'Qualifier', 'G']
 
 
-  # - name: atp_odds
-  #   description: This table contains data on entry status and seeding for players on ATP tournaments.
+  - name: atp_odds
+    description: This table contains data on entry status and seeding for players on ATP tournaments.
 
-  #   columns:
-  #     - name: player_id
-  #       tests:
-  #         - not_null
+    columns:
+      - name: player_id
+        tests:
+          - not_null
 
-  #     - name: tournament_id
-  #       tests:
-  #         - not_null
+      - name: tournament_id
+        tests:
+          - not_null

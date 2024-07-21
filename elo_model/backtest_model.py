@@ -49,7 +49,9 @@ def fit_model(tour):
 def get_test_matches(tour):
 
     next_matches_query = f'''
-                            with players_fitted as (
+                            with 
+
+                            players_fitted as (
                               select distinct p1_name as player
                               from `tennis-358702.model_layer.{tour}_input`
                               where match_date <= {input_end}

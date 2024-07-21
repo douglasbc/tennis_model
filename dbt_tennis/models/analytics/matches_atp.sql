@@ -8,7 +8,9 @@
     }
 )}}
 
-with matches_atp as (
+with 
+
+matches_atp as (
   select * from {{ source('raw_layer', 'matches_atp') }}
 ),
 

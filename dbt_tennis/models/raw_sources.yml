@@ -28,3 +28,19 @@ sources:
       - name: fix_player_names
       - name: atp_predictions
       - name: wta_predictions
+      - name: atp_last_52_serve
+      - name: atp_last_52_return
+      - name: atp_last_52_rally
+      - name: atp_last_52_tactics
+      - name: atp_career_serve
+      - name: atp_career_return 
+      - name: atp_career_rally
+      - name: atp_career_tactics
+      - name: wta_last_52_serve
+      - name: wta_last_52_return
+      - name: wta_last_52_rally
+      - name: wta_last_52_tactics
+      - name: wta_career_serve
+      - name: wta_career_return
+      - name: wta_career_rally
+      - name: wta_career_tactics

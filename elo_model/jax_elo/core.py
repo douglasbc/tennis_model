@@ -141,7 +141,9 @@ def concatenate_and_update(mu1, mu2, a, y, elo_functions, elo_params):
         elo_params: The parameters required for the update
 
     Returns:
-    A Tuple with three elements: the first two contain the new means, the last
+    A Tuple with 
+
+three elements: the first two contain the new means, the last
     the log likelihood of the result.
     """
 
@@ -156,7 +158,9 @@ def concatenate_and_update(mu1, mu2, a, y, elo_functions, elo_params):
 
 
 def update_ratings(carry, x, elo_functions, elo_params):
-    """The function to make an update to use in tandem with lax.scan.
+    """The function to make an update to use in tandem with 
+
+lax.scan.
 
     Args:
         carry: The carry, which contains the current ratings in array form so

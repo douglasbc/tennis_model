@@ -3,7 +3,9 @@
     schema = 'model_layer',
 )}}
 
-with today_atp as (
+with 
+
+today_atp as (
   select * from {{ source('raw_layer', 'today_atp') }}
 ),
 
