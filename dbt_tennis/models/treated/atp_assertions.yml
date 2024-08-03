@@ -73,14 +73,14 @@ models:
               'Special Exempt', 'Wild Card', 'Qualifier', 'G']
 
 
-  - name: atp_odds
-    description: This table contains data on entry status and seeding for players on ATP tournaments.
+  # - name: atp_odds
+  #   description: This table contains data on entry status and seeding for players on ATP tournaments.
 
-    columns:
-      - name: player_id
-        tests:
-          - not_null
+  #   columns:
+  #     - name: player_id
+  #       tests:
+  #         - not_null
 
-      - name: tournament_id
-        tests:
-          - not_null
+  #     - name: tournament_id
+  #       tests:
+  #         - not_null

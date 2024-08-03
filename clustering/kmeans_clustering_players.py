@@ -4,11 +4,11 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 
-from get_data import get_clustering_data
+from get_data import get_player_clustering_data
 
 # Load and preprocess the data
-# data = get_clustering_data('atp')
-data = get_clustering_data('wta')
+data = get_player_clustering_data('atp')
+# data = get_player_clustering_data('wta')
 data = data.set_index('player_name')
 
 # Convert percentage strings to floats
@@ -21,7 +21,7 @@ scaler = StandardScaler()
 normalized_data = scaler.fit_transform(data)
 
 # Perform K-means clustering
-n_clusters = 4
+n_clusters = 6
 kmeans = KMeans(n_clusters=n_clusters, random_state=42)
 cluster_labels = kmeans.fit_predict(normalized_data)
 

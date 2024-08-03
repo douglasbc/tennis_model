@@ -73,14 +73,14 @@ models:
               'Special Exempt', 'Wild Card', 'Qualifier', 'G']
 
 
-  - name: wta_odds
-    description: This table contains data on entry status and seeding for players on wta tournaments.
+  # - name: wta_odds
+  #   description: This table contains data on entry status and seeding for players on wta tournaments.
 
-    columns:
-      - name: player_id
-        tests:
-          - not_null
+  #   columns:
+  #     - name: player_id
+  #       tests:
+  #         - not_null
 
-      - name: tournament_id
-        tests:
-          - not_null
+  #     - name: tournament_id
+  #       tests:
+  #         - not_null

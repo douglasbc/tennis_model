@@ -3,7 +3,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 
-from get_data import get_clustering_data
+from get_data import get_elevation_clustering_data
 
 # Load and preprocess the data
 # data = get_clustering_data('atp')

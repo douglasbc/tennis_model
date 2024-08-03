@@ -35,8 +35,9 @@ def load_odds_to_bq(client, df):
                 'line_period'
                 ]
 
-    df['match_start_at'] = pd.to_datetime(df['match_start_at'], format='%Y/%m/%dT%H:%M:%S')
-   
+    # df['match_start_at'] = pd.to_datetime(df['match_start_at'], format='%Y/%m/%dT%H:%M:%S')
+    df['match_start_at'] = pd.to_datetime(df['match_start_at'], format='mixed')
+    
 
     job_config = bigquery.LoadJobConfig(write_disposition='WRITE_TRUNCATE')
 

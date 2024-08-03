@@ -2,6 +2,9 @@
 config/
 data/
 
+# Odds data
+odds_api/tennis_odds.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

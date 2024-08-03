@@ -24,9 +24,33 @@ country_codes as (
   select * from {{ source('raw_layer', 'country_codes') }}
 ),
 
+tournament_elevation as (
+  select * from {{ ref('tournament_elevation') }}
+),
+
+tournaments_geo as (
+  select
+    tournament_id,
+    to_hex(md5(concat(
+      if(tournament_name = 'M15 Quito', -0.13, tournament_latitude),
+      if(tournament_name = 'M15 Quito', -78.300003, tournament_longitude)
+      ))) as geo_id,
+    surface_id,
+    tournament_date,
+    tournament_name,
+    tournament_level,
+    tournament_tier,
+    if(tournament_name = 'M15 Quito', -0.13, tournament_latitude) as tournament_latitude,
+    if(tournament_name = 'M15 Quito', -78.300003, tournament_longitude) as tournament_longitude,
+    tournament_prize,
+    country
+  from tournaments_atp
+),
+
 final as (
   select
     t.tournament_id,
+    t.geo_id,
     t.tournament_date,
     t.tournament_name,
     cc.country,
@@ -58,14 +82,17 @@ final as (
         then 'Next Gen ATP Finals'
       else t.tournament_tier
     end as tournament_tier,
-    t.tournament_prize
-  from tournaments_atp as t
+    t.tournament_prize,
+    t.tournament_latitude,
+    t.tournament_longitude,
+    e.elevation as tournament_elevation
+  from tournaments_geo as t
     left join courts as c
       on t.surface_id = c.surface_id
     left join country_codes as cc
       on t.country = cc.country_code
+    left join tournament_elevation as e
+      on t.geo_id = e.geo_id
 )
 
 select * from final
-
-

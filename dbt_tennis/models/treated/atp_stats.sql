@@ -11,6 +11,7 @@ stats as (
 
 final as (
     select    
+      to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id,
       player_1_id,
       player_2_id,
       tournament_id,

@@ -44,3 +44,4 @@ sources:
       - name: wta_career_return
       - name: wta_career_rally
       - name: wta_career_tactics
+      - name: historical_weather

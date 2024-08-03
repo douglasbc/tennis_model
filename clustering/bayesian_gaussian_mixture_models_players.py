@@ -1,7 +1,7 @@
 from sklearn.preprocessing import StandardScaler
 from sklearn.mixture import BayesianGaussianMixture
 
-from get_data import get_clustering_data
+from get_data import get_player_clustering_data
 
 # Load and preprocess the data
 data = get_clustering_data('atp')
