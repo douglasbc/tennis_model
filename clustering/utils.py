@@ -1,4 +1,7 @@
+from google.cloud import bigquery
+
 from bq_client import bigquery_client
+
 
 client = bigquery_client()
 
@@ -18,6 +21,7 @@ from `tennis-358702.treated_layer.{tour}_clustering_input`
 def get_elevation_clustering_data():
     query = f'''
 select
+  geo_id,
   elevation
 from `tennis-358702.treated_layer.tournament_elevation`
  '''
@@ -35,6 +39,7 @@ select
     query_job = client.query(query)
     return query_job.result().to_dataframe()
 
+
 def get_wind_speed_clustering_data():
     query = f'''
 select
@@ -44,3 +49,11 @@ select
  '''
     query_job = client.query(query)
     return query_job.result().to_dataframe()
+
+
+def load_clusters_to_bq(client, df, table_id):
+    job_config = bigquery.LoadJobConfig(write_disposition='WRITE_TRUNCATE')
+    job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
+    job.result()
+
+    print(f"Loaded data to table {table_id}")

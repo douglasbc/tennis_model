@@ -1,6 +1,7 @@
 beautifulsoup4
 dbt-bigquery
-google-api-python-client
+google-api-python-client==2.55.0
+google-cloud-bigquery-storage
 jax==0.4.6
 jaxlib==0.4.6
 matplotlib

@@ -3,11 +3,11 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 
-import get_data
+import clustering.utils as utils
 
 # Load and preprocess the data
-data = get_data.get_elevation_clustering_data()
-data = data.set_index('elevation_id')
+data = utils.get_elevation_clustering_data()
+data = data.set_index('geo_id')
 
 # Convert percentage strings to floats
 for col in data.columns:

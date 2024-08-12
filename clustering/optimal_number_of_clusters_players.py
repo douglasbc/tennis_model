@@ -3,11 +3,11 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 
-from get_data import get_elevation_clustering_data
+import clustering.utils as utils
 
 # Load and preprocess the data
-# data = get_clustering_data('atp')
-data = get_clustering_data('wta')
+data = utils.get_player_clustering_data('atp')
+# data = utils.get_player_clustering_data('wta')
 data = data.set_index('player_name')
 
 # Convert percentage strings to floats

@@ -49,7 +49,7 @@ predictions as (
     p2_probability as p2_model_p,
     p1_fair_odds as p1_model_odds,
     p2_fair_odds as p2_model_odds
-  from `tennis-358702.model_layer.atp_predictions`
+  from `tennis-358702.raw_layer.atp_predictions`
   union all
   select
     p1_name,
@@ -58,7 +58,7 @@ predictions as (
     p2_probability as p2_model_p,
     p1_fair_odds as p1_model_odds,
     p2_fair_odds as p2_model_odds
-  from `tennis-358702.model_layer.wta_predictions`
+  from `tennis-358702.raw_layer.wta_predictions`
 )
 select
   match_start_at,

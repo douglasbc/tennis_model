@@ -45,3 +45,6 @@ sources:
       - name: wta_career_rally
       - name: wta_career_tactics
       - name: historical_weather
+      - name: elevation_clusters
+      - name: atp_players_clusters
+      - name: wta_players_clusters

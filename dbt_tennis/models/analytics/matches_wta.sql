@@ -77,6 +77,14 @@ final as (
       r1.ranking_position as p1_ranking,
       r2.ranking_position as p2_ranking,
       m.result,
+      (
+        select sum(cast(number as int64))
+        from unnest(regexp_extract_all(regexp_replace(m.result, r'\([^)]*\)', ''), r'(\d+)-')) number
+      ) as p1_total_games,
+      (
+        select sum(cast(number as int64))
+        from unnest(regexp_extract_all(regexp_replace(m.result, r'\([^)]*\)', ''), r'-(\d+)')) number
+      ) as p2_total_games,
       s.p1_service_points_played,
       s.p1_service_points_won,
       s.p1_return_points_played,
@@ -112,4 +120,4 @@ final as (
     where extract(year from m.match_date) >= 2015
 )
 
-select * from final
+select distinct * from final

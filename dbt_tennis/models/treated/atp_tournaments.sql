@@ -24,8 +24,8 @@ country_codes as (
   select * from {{ source('raw_layer', 'country_codes') }}
 ),
 
-tournament_elevation as (
-  select * from {{ ref('tournament_elevation') }}
+elevation_clusters as (
+  select * from {{ ref('elevation_clusters') }}
 ),
 
 tournaments_geo as (
@@ -85,14 +85,15 @@ final as (
     t.tournament_prize,
     t.tournament_latitude,
     t.tournament_longitude,
-    e.elevation as tournament_elevation
+    ec.elevation as tournament_elevation,
+    ec.cluster_label as elevation_cluster
   from tournaments_geo as t
     left join courts as c
       on t.surface_id = c.surface_id
     left join country_codes as cc
       on t.country = cc.country_code
-    left join tournament_elevation as e
-      on t.geo_id = e.geo_id
+    left join elevation_clusters as ec
+      on t.geo_id = ec.geo_id
 )
 
 select * from final

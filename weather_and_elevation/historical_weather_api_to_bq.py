@@ -62,7 +62,7 @@ def historical_weather_api_to_df(latitude, longitude, start_date, end_date):
 def iterate_historical_weather_df_to_bq(input_table):
 	historical_weather_input_df = get_input_data(client, input_table)
 
-	output_table = f'tennis-358702.raw_layer.historical_weather'
+	output_table = 'tennis-358702.raw_layer.historical_weather'
 
 	df = pd.DataFrame()
 

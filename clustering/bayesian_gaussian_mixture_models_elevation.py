@@ -1,11 +1,11 @@
 from sklearn.preprocessing import StandardScaler
 from sklearn.mixture import BayesianGaussianMixture
 
-from get_data import get_player_clustering_data
+import clustering.utils as utils
 
 # Load and preprocess the data
-data = get_data.get_elevation_clustering_data()
-data = data.set_index('elevation_id')
+data = utils.get_elevation_clustering_data()
+data = data.set_index('geo_id')
 
 # Convert percentage strings to floats
 for col in data.columns:
