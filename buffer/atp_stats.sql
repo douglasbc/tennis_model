@@ -1,0 +1,107 @@
+{{ config(
+    materialized = 'table',
+    schema = 'silver'
+)}}
+
+with
+
+matches_atp as (
+  select
+    to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id,
+    match_date
+  from {{ source('raw_layer', 'matches_atp') }}
+),
+
+atp_players as (
+  select *
+  from {{ ref('atp_players') }}
+),
+
+fix_flashscore_scraping_player_names as (
+  select *
+  from {{ source('raw_layer', 'fix_flashscore_scraping_player_names') }}
+),
+
+fix_player_names as (
+  select *
+  from {{ source('raw_layer', 'fix_player_names') }}
+),
+
+oncourt_stats as (
+  select
+    *,
+    to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id
+  from {{ source('raw_layer', 'stats_atp') }}
+),
+
+flashscore_stats_manual as (
+  select * from {{ source('raw_layer', 'flashscore_stats_manual') }}
+),
+
+flashscore_stats_scraped as (
+  select
+    date(match_timestamp) as match_date,
+    p1.player_name as player_1_name,
+    p2.player_name as player_2_name,
+    p1_winners,
+    p1_unforced_errors,
+    p1_net_points_won,
+    p1_net_points_played,
+    p2_winners,
+    p2_unforced_errors,
+    p2_net_points_won,
+    p2_net_points_played
+  from {{ source('raw_layer', 'flashscore_stats_scraped') }} as fs
+  left join fix_flashscore_scraping_player_names as fix1 on fix1.flashscore_name = fs.p1_name
+  left join fix_flashscore_scraping_player_names as fix2 on fix2.flashscore_name = fs.p2_name
+  left join (select player_name, player_standardized_name from atp_players where last_match_date >= date('2025-03-19')) as p1
+    on p1.player_standardized_name = coalesce(fix1.oncourt_standardized_name, fs.p1_name)
+  left join (select player_name, player_standardized_name from atp_players where last_match_date >= date('2025-03-19')) as p2
+    on p2.player_standardized_name = coalesce(fix2.oncourt_standardized_name, fs.p2_name)
+),
+
+atp_match_charting_repo_stats as (
+  select * from {{ source('raw_layer', 'atp_match_charting_repo_stats') }}
+),
+
+final as (
+  select
+    match_id,
+    m.match_date,
+    player_1_id,
+    p1.player_name as player_1_name,
+    player_2_id,
+    p2.player_name as player_2_name,
+    tournament_id,
+    round_id,
+    p1_first_serve_attempts as p1_service_points_played,
+    (p1_total_points - p1_return_points_won) as p1_service_points_won,
+    p2_first_serve_attempts as p1_return_points_played,
+    p1_return_points_won,
+    p1_aces,
+    p1_double_faults,
+    COALESCE(o.p1_winners, fm.p1_winners, fs1.p1_winners, fs2.p2_winners, ) as p1_winners,
+    COALESCE(o.p1_unforced_errors, fm.p1_unforced_errors, fs1.p1_unforced_errors, fs2.p1_unforced_errors, ) as p1_unforced_errors,
+    COALESCE(o.p1_net_points_won, fm.p1_net_points_won, fs1.p1_net_points_won, fs2.p1_net_points_won, ) as p1_net_points_won,
+    COALESCE(o.p1_net_points_played, fm.p1_net_points_played, fs1.p1_net_points_played, fs2.p1_net_points_played, ) as p1_net_points_played,
+    p2_first_serve_attempts as p2_service_points_played,
+    (p2_total_points - p2_return_points_won) as p2_service_points_won,
+    p1_first_serve_attempts as p2_return_points_played,
+    p2_return_points_won,
+    p2_aces,
+    p2_double_faults,
+    COALESCE(o.p2_winners, fm.p2_winners, fs2.p2_winners, fs1.p1_winners, ) as p1_winners,
+    COALESCE(o.p2_unforced_errors, fm.p2_unforced_errors, fs2.p2_unforced_errors, fs1.p1_winners, ) as p2_unforced_errors,
+    COALESCE(o.p2_net_points_won, fm.p2_net_points_won, fs2.p2_net_points_won, fs1.p1_winners, ) as p2_net_points_won,
+    COALESCE(o.p2_net_points_played, fm.p2_net_points_played, fs2.p2_net_points_played, fs1.p1_winners, ) as p2_net_points_played,
+  from oncourt_stats as o
+  left join atp_matches as m on m.match_id = o.match_id
+  left join flashscore_stats_manual as fm on fm.match_id = o.match_id
+  left join atp_players as p1 on p1.player_id = o.player_1_id
+  left join atp_players as p2 on p2.player_id = o.player_2_id
+  left join flashscore_stats_scraped as fs1
+    on fs1.match_date = m.match_date and fs1.player_1_name = p1.player_name and fs1.player_2_name = p2.player_name
+  left join flashscore_stats_scraped as fs2
+    on fs2.match_date = m.match_date and fs2.player_1_name = p2.player_name and fs2.player_2_name = p1.player_name
+
+select * from final
