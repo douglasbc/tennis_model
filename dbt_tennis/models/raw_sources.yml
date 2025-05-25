@@ -3,21 +3,21 @@ version: 2
 sources:
   - name: raw_layer
     tables: 
-      - name: categories_wta
-      - name: matches_wta
-      - name: odds_wta
-      - name: players_wta
-      - name: rankings_wta
-      - name: seeds_wta
-      - name: stats_wta
-      - name: today_wta
+#       - name: categories_wta
+#       - name: matches_wta
+#       - name: odds_wta
+#       - name: players_wta
+#       - name: rankings_wta
+#       - name: seeds_wta
+#       - name: stats_wta
+#       - name: today_wta
       - name: tournaments_wta
       - name: categories_atp
       - name: matches_atp
       - name: odds_atp
       - name: players_atp
-      - name: rankings_atp
-      - name: seeds_atp
+#       - name: rankings_atp
+#       - name: seeds_atp
       - name: stats_atp
       - name: today_atp
       - name: tournaments_atp
@@ -27,24 +27,24 @@ sources:
       - name: pinnacle_odds
       - name: fix_player_names
       - name: atp_predictions
-      - name: wta_predictions
-      - name: atp_last_52_serve
-      - name: atp_last_52_return
-      - name: atp_last_52_rally
-      - name: atp_last_52_tactics
-      - name: atp_career_serve
-      - name: atp_career_return 
-      - name: atp_career_rally
-      - name: atp_career_tactics
-      - name: wta_last_52_serve
-      - name: wta_last_52_return
-      - name: wta_last_52_rally
-      - name: wta_last_52_tactics
-      - name: wta_career_serve
-      - name: wta_career_return
-      - name: wta_career_rally
-      - name: wta_career_tactics
-      - name: historical_weather
-      - name: elevation_clusters
-      - name: atp_players_clusters
-      - name: wta_players_clusters
+#       - name: wta_predictions
+#       - name: atp_last_52_serve
+#       - name: atp_last_52_return
+#       - name: atp_last_52_rally
+#       - name: atp_last_52_tactics
+#       - name: atp_career_serve
+#       - name: atp_career_return
+#       - name: atp_career_rally
+#       - name: atp_career_tactics
+#       - name: wta_last_52_serve
+#       - name: wta_last_52_return
+#       - name: wta_last_52_rally
+#       - name: wta_last_52_tactics
+#       - name: wta_career_serve
+#       - name: wta_career_return
+#       - name: wta_career_rally
+#       - name: wta_career_tactics
+#       - name: historical_weather
+#       - name: elevation_clusters
+#       - name: atp_players_clusters
+#       - name: wta_players_clusters

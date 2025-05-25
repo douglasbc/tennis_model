@@ -6,11 +6,11 @@ from google.oauth2 import service_account
 import pandas as pd
 
 from bq_client import bigquery_client
-from scrape_mcp_to_df import scrape_mcp
+# from scrape_mcp_to_df import scrape_mcp
 
 
 client = bigquery_client()
-df_dict = scrape_mcp()
+# df_dict = scrape_mcp()
 
 
 class TennisTable():
@@ -174,7 +174,8 @@ class TennisTable():
             self.df = self.df[i-1:]
 
         job = client.load_table_from_dataframe(self.df, table_id, job_config=job_config)
-        job.result()
+#         job.result()
+        job.result(timeout=36000)
 
         print(f"Loaded table {table_id}")
 
@@ -709,15 +710,15 @@ def increment_to_bq():
 
 def full_refresh_to_bq():    
 
-    load_categories()
+#     load_categories()
     # load_courts()
-    load_matches()
-    load_odds()
-    load_players()
-    load_rankings()
+#     load_rankings()
     # load_rounds()
-    load_seeds()
-    load_stats()
+#     load_seeds()
     load_today()
     load_tournaments()
-    load_match_charting_project()
+    load_matches()
+    load_stats()
+    load_odds()
+    load_players()
+#     load_match_charting_project()

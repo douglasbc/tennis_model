@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+    <data-source source="LOCAL" name="BigQuery Tennis" uuid="63246524-49bd-4d2d-8c9f-ef6408d5e931">
+      <driver-ref>bigquery</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>com.simba.googlebigquery.jdbc42.Driver</jdbc-driver>
+      <jdbc-url>jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443</jdbc-url>
+      <jdbc-additional-properties>
+        <property name="ProjectId" value="tennis-358702" />
+        <property name="OAuthServiceAcctEmail" value="tennis-service-account@tennis-358702.iam.gserviceaccount.com" />
+        <property name="OAuthPvtKeyPath" value="$PROJECT_DIR$/config/key.json" />
+      </jdbc-additional-properties>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
+  </component>
+</project>
