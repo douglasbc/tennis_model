@@ -10,8 +10,8 @@ MDB_PATH = os.path.join('raw', 'OnCourt', 'OnCourt.mdb')
 
 
 def main():
-#     backup_csv()
-#     extract_mdb_to_csv()
+    backup_csv()
+    extract_mdb_to_csv()
     full_refresh_to_bq()
 
 

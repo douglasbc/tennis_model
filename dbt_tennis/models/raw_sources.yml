@@ -26,6 +26,10 @@ sources:
       - name: rounds
       - name: pinnacle_odds
       - name: fix_player_names
+      - name: fix_flashscore_scraping_player_names
+      - name: atp_match_charting_repo_stats
+      - name: flashscore_stats_scraped
+      - name: flashscore_stats_manual
       - name: atp_predictions
 #       - name: wta_predictions
 #       - name: atp_last_52_serve

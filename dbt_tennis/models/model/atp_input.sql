@@ -1,6 +1,6 @@
 {{ config(
     materialized = 'table',
-    schema = 'silver',
+    schema = 'model',
     partition_by = {
       "field": "match_date",
       "data_type": "date",

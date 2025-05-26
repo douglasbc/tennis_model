@@ -61,12 +61,26 @@ flashscore_stats_scraped as (
 ),
 
 atp_match_charting_repo_stats as (
-  select * from {{ source('raw_layer', 'atp_match_charting_repo_stats') }}
+  select
+    match_date,
+    coalesce(fix1.oncourt_name, mc.p1_name) as player_1_name,
+    coalesce(fix2.oncourt_name, mc.p2_name) as player_2_name,
+    p1_winners,
+    p1_unforced as p1_unforced_errors,
+    p1_net_pts_won as p1_net_points_won,
+    p1_net_pts as p1_net_points_played,
+    p2_winners,
+    p2_unforced as p2_unforced_errors,
+    p2_net_pts_won as p2_net_points_won,
+    p2_net_pts as p2_net_points_played
+  from {{ source('raw_layer', 'atp_match_charting_repo_stats') }} as mc
+  left join fix_player_names as fix1 on fix1.match_charting_project_name = mc.p1_name
+  left join fix_player_names as fix2 on fix2.match_charting_project_name = mc.p2_name
 ),
 
 final as (
   select
-    match_id,
+    o.match_id,
     m.match_date,
     player_1_id,
     p1.player_name as player_1_name,
@@ -80,22 +94,22 @@ final as (
     p1_return_points_won,
     p1_aces,
     p1_double_faults,
-    COALESCE(o.p1_winners, fm.p1_winners, fs1.p1_winners, fs2.p2_winners, ) as p1_winners,
-    COALESCE(o.p1_unforced_errors, fm.p1_unforced_errors, fs1.p1_unforced_errors, fs2.p1_unforced_errors, ) as p1_unforced_errors,
-    COALESCE(o.p1_net_points_won, fm.p1_net_points_won, fs1.p1_net_points_won, fs2.p1_net_points_won, ) as p1_net_points_won,
-    COALESCE(o.p1_net_points_played, fm.p1_net_points_played, fs1.p1_net_points_played, fs2.p1_net_points_played, ) as p1_net_points_played,
+    COALESCE(o.p1_winners, fm.p1_winners, fs1.p1_winners, fs2.p2_winners, mc1.p1_winners, mc2.p2_winners) as p1_winners,
+    COALESCE(o.p1_unforced_errors, fm.p1_unforced_errors, fs1.p1_unforced_errors, fs2.p2_unforced_errors, mc1.p1_unforced_errors, mc2.p2_unforced_errors) as p1_unforced_errors,
+    COALESCE(o.p1_net_points_won, fm.p1_net_points_won, fs1.p1_net_points_won, fs2.p2_net_points_won, mc1.p1_net_points_won, mc2.p2_net_points_won) as p1_net_points_won,
+    COALESCE(o.p1_net_points_played, fm.p1_net_points_played, fs1.p1_net_points_played, fs2.p2_net_points_played, mc1.p1_net_points_played, mc2.p2_net_points_played) as p1_net_points_played,
     p2_first_serve_attempts as p2_service_points_played,
     (p2_total_points - p2_return_points_won) as p2_service_points_won,
     p1_first_serve_attempts as p2_return_points_played,
     p2_return_points_won,
     p2_aces,
     p2_double_faults,
-    COALESCE(o.p2_winners, fm.p2_winners, fs2.p2_winners, fs1.p1_winners, ) as p1_winners,
-    COALESCE(o.p2_unforced_errors, fm.p2_unforced_errors, fs2.p2_unforced_errors, fs1.p1_winners, ) as p2_unforced_errors,
-    COALESCE(o.p2_net_points_won, fm.p2_net_points_won, fs2.p2_net_points_won, fs1.p1_winners, ) as p2_net_points_won,
-    COALESCE(o.p2_net_points_played, fm.p2_net_points_played, fs2.p2_net_points_played, fs1.p1_winners, ) as p2_net_points_played,
+    COALESCE(o.p2_winners, fm.p2_winners, fs1.p2_winners, fs2.p1_winners, mc1.p2_winners, mc2.p1_winners) as p2_winners,
+    COALESCE(o.p2_unforced_errors, fm.p2_unforced_errors, fs1.p2_unforced_errors, fs2.p1_winners, mc1.p2_unforced_errors, mc2.p1_winners) as p2_unforced_errors,
+    COALESCE(o.p2_net_points_won, fm.p2_net_points_won, fs1.p2_net_points_won, fs2.p1_winners, mc1.p2_net_points_won, mc2.p1_winners) as p2_net_points_won,
+    COALESCE(o.p2_net_points_played, fm.p2_net_points_played, fs1.p2_net_points_played, fs2.p1_winners, mc1.p2_net_points_played, mc2.p1_winners) as p2_net_points_played,
   from oncourt_stats as o
-  left join atp_matches as m on m.match_id = o.match_id
+  left join matches_atp as m on m.match_id = o.match_id
   left join flashscore_stats_manual as fm on fm.match_id = o.match_id
   left join atp_players as p1 on p1.player_id = o.player_1_id
   left join atp_players as p2 on p2.player_id = o.player_2_id
@@ -103,5 +117,10 @@ final as (
     on fs1.match_date = m.match_date and fs1.player_1_name = p1.player_name and fs1.player_2_name = p2.player_name
   left join flashscore_stats_scraped as fs2
     on fs2.match_date = m.match_date and fs2.player_1_name = p2.player_name and fs2.player_2_name = p1.player_name
+  left join atp_match_charting_repo_stats as mc1
+    on mc1.match_date = m.match_date and mc1.player_1_name = p1.player_name and mc1.player_2_name = p2.player_name
+  left join atp_match_charting_repo_stats as mc2
+    on mc2.match_date = m.match_date and mc2.player_1_name = p2.player_name and mc2.player_2_name = p1.player_name
+)
 
 select * from final

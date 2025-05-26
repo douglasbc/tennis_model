@@ -710,11 +710,11 @@ def increment_to_bq():
 
 def full_refresh_to_bq():    
 
-#     load_categories()
+    load_categories()
     # load_courts()
-#     load_rankings()
+    # load_rankings()
     # load_rounds()
-#     load_seeds()
+    # load_seeds()
     load_today()
     load_tournaments()
     load_matches()

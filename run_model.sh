@@ -7,6 +7,6 @@ dbt run &&
 cd ..
 # python3 -i elo_model/atp_model.py &
 python3 elo_model/atp_model.py &
-python3 elo_model/wta_model.py &
+# python3 elo_model/wta_model.py &
 wait
 deactivate
