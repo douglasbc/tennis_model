@@ -17,38 +17,60 @@ client = bigquery_client()
 #     query_job = client.query(query)
 #     return query_job.result().to_dataframe()
 
-def get_rally_agression_clustering_data(tour):
+def get_rally_aggression_clustering_data(tour):
     query = f'''
 select
   player_name,
-  unreturned_pct,
-  rally_agression_score,
-from `tennis-358702.treated_layer.{tour}_clustering_input`
+  rally_aggression_score,
+from `tennis-358702.model.{tour}_clustering_input`
+where rally_aggression_score is not null
  '''
     query_job = client.query(query)
     return query_job.result().to_dataframe()
 
-def get_player_clustering_data(tour):
+def get_serve_dependency_clustering_data(tour):
     query = f'''
 select
   player_name,
-  unreturned_pct,
-  rally_agression_score,
-from `tennis-358702.treated_layer.{tour}_clustering_input`
+  serve_dependency_score,
+from `tennis-358702.model.{tour}_clustering_input`
+where serve_dependency_score is not null
  '''
     query_job = client.query(query)
     return query_job.result().to_dataframe()
 
-def get_player_clustering_data(tour):
+def get_net_points_clustering_data(tour):
     query = f'''
 select
   player_name,
-  unreturned_pct,
-  rally_agression_score,
-from `tennis-358702.treated_layer.{tour}_clustering_input`
+  net_points_ratio,
+from `tennis-358702.model.{tour}_clustering_input`
+where net_points_ratio is not null
  '''
     query_job = client.query(query)
     return query_job.result().to_dataframe()
+
+# def get_player_clustering_data(tour):
+#     query = f'''
+# select
+#   player_name,
+#   unreturned_pct,
+#   rally_agression_score,
+# from `tennis-358702.treated_layer.{tour}_clustering_input`
+#  '''
+#     query_job = client.query(query)
+#     return query_job.result().to_dataframe()
+#
+# def get_player_clustering_data(tour):
+#     query = f'''
+# select
+#   player_name,
+#   unreturned_pct,
+#   rally_agression_score,
+# from `tennis-358702.treated_layer.{tour}_clustering_input`
+#  '''
+#     query_job = client.query(query)
+#     return query_job.result().to_dataframe()
 
 
 # def get_elevation_clustering_data():

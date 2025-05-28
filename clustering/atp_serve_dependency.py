@@ -7,18 +7,18 @@ import utils
 client = utils.bigquery_client()
 
 # Load and preprocess data
-data = utils.get_rally_aggression_clustering_data('atp')
+data = utils.get_serve_dependency_clustering_data('atp')
 data = data.set_index('player_name')
 
 # Convert to numeric (handled in query but double-check)
-data['rally_aggression_score'] = pd.to_numeric(data['rally_aggression_score'], errors='coerce')
+data['serve_dependency_score'] = pd.to_numeric(data['serve_dependency_score'], errors='coerce')
 
 # Normalize the data
 scaler = StandardScaler()
 normalized_data = scaler.fit_transform(data)
 
 # Perform K-means clustering
-n_clusters = 4
+n_clusters = 5
 kmeans = KMeans(n_clusters=n_clusters, random_state=42)
 cluster_labels = kmeans.fit_predict(normalized_data)
 
@@ -27,7 +27,7 @@ centroids_original = scaler.inverse_transform(kmeans.cluster_centers_)
 sorted_order = np.argsort(centroids_original.flatten())
 sorted_centroids = centroids_original[sorted_order]
 
-# Create label mapping from old to new ordered labels (1-4)
+# Create label mapping from old to new ordered labels (1-5)
 label_mapping = {old: new+1 for new, old in enumerate(sorted_order)}
 reverse_mapping = {new+1: old for new, old in enumerate(sorted_order)}
 
@@ -57,14 +57,14 @@ final_df = results[['player_name', 'best_cluster', 'distance_to_best_cluster',
 
 # Create sorted centroid DataFrame
 centroid_df = pd.DataFrame(sorted_centroids,
-                          columns=['centroid_rally_aggression_score'],
-                          index=pd.Index([1, 2, 3, 4], name='cluster'))
+                          columns=['centroid_serve_dependency_score'],
+                          index=pd.Index([1, 2, 3, 4, 5], name='cluster'))
 
 # Print cluster info with counts
 cluster_counts = results['best_cluster'].value_counts().sort_index()
-print("\nCluster Centroids (ordered from 1=lowest to 4=highest):")
+print("\nCluster Centroids (ordered from 1=lowest to 5=highest):")
 for cluster, row in centroid_df.iterrows():
     print(f"Cluster {cluster} ({cluster_counts.get(cluster, 0)} players): {row[0]:.4f}")
 
 # Upload to BigQuery
-utils.load_clusters_to_bq(client, final_df, 'tennis-358702.raw_layer.atp_rally_aggression_clusters')
+utils.load_clusters_to_bq(client, final_df, 'tennis-358702.raw_layer.atp_serve_dependency_clusters')

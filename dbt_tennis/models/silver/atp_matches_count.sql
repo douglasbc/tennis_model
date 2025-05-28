@@ -5,20 +5,20 @@
 
 with 
 
-atp_input as (
-  select * from {{ ref('atp_input') }}
+atp_model_input as (
+  select * from {{ ref('atp_model_input') }}
 ),
 
 player_matches_year as (
   select
     p1_name as player
-  from atp_input
+  from atp_model_input
   where
     match_date >= date_sub(current_date('America/Sao_Paulo'), interval 1 year)
   union all
   select
     p2_name as player
-  from atp_input
+  from atp_model_input
   where
     match_date >= date_sub(current_date('America/Sao_Paulo'), interval 1 year)
 ),
@@ -26,13 +26,13 @@ player_matches_year as (
 player_matches_quarter as (
   select
     p1_name as player
-  from atp_input
+  from atp_model_input
   where
     match_date >= date_sub(current_date('America/Sao_Paulo'), interval 90 day)
   union all
   select
     p2_name as player
-  from atp_input
+  from atp_model_input
   where
     match_date >= date_sub(current_date('America/Sao_Paulo'), interval 90 day)
 ),

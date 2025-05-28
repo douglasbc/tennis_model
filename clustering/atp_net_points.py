@@ -7,11 +7,11 @@ import utils
 client = utils.bigquery_client()
 
 # Load and preprocess data
-data = utils.get_rally_aggression_clustering_data('atp')
+data = utils.get_net_points_clustering_data('atp')
 data = data.set_index('player_name')
 
 # Convert to numeric (handled in query but double-check)
-data['rally_aggression_score'] = pd.to_numeric(data['rally_aggression_score'], errors='coerce')
+data['net_points_ratio'] = pd.to_numeric(data['net_points_ratio'], errors='coerce')
 
 # Normalize the data
 scaler = StandardScaler()
@@ -57,7 +57,7 @@ final_df = results[['player_name', 'best_cluster', 'distance_to_best_cluster',
 
 # Create sorted centroid DataFrame
 centroid_df = pd.DataFrame(sorted_centroids,
-                          columns=['centroid_rally_aggression_score'],
+                          columns=['centroid_net_points_ratio'],
                           index=pd.Index([1, 2, 3, 4], name='cluster'))
 
 # Print cluster info with counts
@@ -67,4 +67,4 @@ for cluster, row in centroid_df.iterrows():
     print(f"Cluster {cluster} ({cluster_counts.get(cluster, 0)} players): {row[0]:.4f}")
 
 # Upload to BigQuery
-utils.load_clusters_to_bq(client, final_df, 'tennis-358702.raw_layer.atp_rally_aggression_clusters')
+utils.load_clusters_to_bq(client, final_df, 'tennis-358702.raw_layer.atp_net_points_clusters')

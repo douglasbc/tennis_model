@@ -1,6 +1,6 @@
 {{ config(
     materialized = 'table',
-    schema = 'silver',
+    schema = 'analytics',
     partition_by = {
       "field": "match_date",
       "data_type": "date",
@@ -10,11 +10,10 @@
 
 with 
 
-matches_atp as (
+atp_matches as (
   select
-    to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id,
     *
-  from {{ source('raw_layer', 'matches_atp') }}
+  from {{ ref('atp_matches') }}
 ),
 
 atp_players as (
@@ -35,18 +34,6 @@ atp_odds as (
 
 rounds as (
   select * from {{ source('raw_layer', 'rounds') }}
-),
-
-atp_serve_dependency_clusters as (
-  select * from {{ source('raw_layer', 'atp_serve_dependency_clusters') }}
-),
-
-atp_rally_aggression_cluster as (
-  select * from {{ source('raw_layer', 'atp_rally_aggression_cluster') }}
-),
-
-atp_net_points_cluster as (
-  select * from {{ source('raw_layer', 'atp_net_points_cluster') }}
 ),
 
 final as (
@@ -102,13 +89,7 @@ final as (
       o.p1_handicap_line,
       safe_multiply(o.p1_handicap_line, -1) as p2_handicap_line,
       o.p1_handicap_odds,
-      o.p2_handicap_odds,
-      cs1.best_cluster as p1_serve_dependency_cluster,
-      cs2.best_cluster as p2_serve_dependency_cluster,
-      cr1.best_cluster as p1_rally_aggression_cluster,
-      cr2.best_cluster as p2_rally_aggression_cluster,
-      cn1.best_cluster as p1_net_points_cluster,
-      cn2.best_cluster as p2_net_points_cluster
+      o.p2_handicap_odds
     from matches_atp as m
       inner join atp_players as p1 on m.player_1_id = p1.player_id
       inner join atp_players as p2 on m.player_2_id = p2.player_id
@@ -123,13 +104,6 @@ final as (
 --       left join rankings_atp as r2 on m.player_2_id = r2.player_id
 --         and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
       left join rounds as r on m.round_id = r.round_id
-      left join atp_serve_dependency_clusters as cs1 on p1.player_name = cs.player_name
-      left join atp_serve_dependency_clusters as cs2 on p2.player_name = cs.player_name
-      left join atp_rally_aggression_cluster as cr1 on p1.player_name = cr.player_name
-      left join atp_rally_aggression_cluster as cr2 on p2.player_name = cr.player_name
-      left join atp_net_points_cluster as cn1 on p1.player_name = cn.player_name
-      left join atp_net_points_cluster as cn2 on p2.player_name = cn.player_name
-
     where extract(year from m.match_date) >= 2015
 )
 

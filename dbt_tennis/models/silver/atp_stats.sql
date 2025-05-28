@@ -8,7 +8,8 @@ with
 matches_atp as (
   select
     to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id,
-    match_date
+    match_date,
+    result
   from {{ source('raw_layer', 'matches_atp') }}
 ),
 
@@ -30,8 +31,10 @@ fix_player_names as (
 oncourt_stats as (
   select
     *,
-    to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id
+    to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id,
+    p1_total_points + p2_total_points as match_total_points
   from {{ source('raw_layer', 'stats_atp') }}
+  where p1_total_points is not null and p2_total_points is not null
 ),
 
 flashscore_stats_manual as (
@@ -88,6 +91,7 @@ final as (
     p2.player_name as player_2_name,
     tournament_id,
     round_id,
+    match_total_points,
     p1_first_serve_attempts as p1_service_points_played,
     (p1_total_points - p1_return_points_won) as p1_service_points_won,
     p2_first_serve_attempts as p1_return_points_played,
@@ -108,8 +112,8 @@ final as (
     COALESCE(o.p2_unforced_errors, fm.p2_unforced_errors, fs1.p2_unforced_errors, fs2.p1_winners, mc1.p2_unforced_errors, mc2.p1_winners) as p2_unforced_errors,
     COALESCE(o.p2_net_points_won, fm.p2_net_points_won, fs1.p2_net_points_won, fs2.p1_winners, mc1.p2_net_points_won, mc2.p1_winners) as p2_net_points_won,
     COALESCE(o.p2_net_points_played, fm.p2_net_points_played, fs1.p2_net_points_played, fs2.p1_winners, mc1.p2_net_points_played, mc2.p1_winners) as p2_net_points_played,
-  from oncourt_stats as o
-  left join matches_atp as m on m.match_id = o.match_id
+  from (select * from oncourt_stats where match_total_points > 0) as o
+  join (select * from matches_atp where regexp_extract(result, r'([a-zA-Z]+)') is null) as m on m.match_id = o.match_id
   left join flashscore_stats_manual as fm on fm.match_id = o.match_id
   left join atp_players as p1 on p1.player_id = o.player_1_id
   left join atp_players as p2 on p2.player_id = o.player_2_id
@@ -123,4 +127,4 @@ final as (
     on mc2.match_date = m.match_date and mc2.player_1_name = p2.player_name and mc2.player_2_name = p1.player_name
 )
 
-select * from final
+select * from final where player_1_name is not null and player_2_name is not null
