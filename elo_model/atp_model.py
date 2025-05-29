@@ -22,7 +22,7 @@ def get_input_data(tour):
                       tournament_tier,
                       round,
                       margins   
-                    from `tennis-358702.model.{tour}_input`                 
+                    from `tennis-358702.model.{tour}_model_input`                 
                     '''
 
     df = client.query(input_query).to_dataframe()
@@ -52,10 +52,10 @@ def get_todays_matches(tour):
 
                             players_fitted as (
                               select distinct p1_name as player
-                              from `tennis-358702.model.{tour}_input`
+                              from `tennis-358702.model.{tour}_model_input`
                               union all
                               select distinct p2_name as player
-                              from `tennis-358702.model.{tour}_input`
+                              from `tennis-358702.model.{tour}_model_input`
                             )
                             select * from `tennis-358702.silver.{tour}_today`
                             where

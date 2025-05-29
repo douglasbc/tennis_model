@@ -38,7 +38,6 @@
     <file url="file://$PROJECT_DIR$/buffer/old_models/treated/wta_stats.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/buffer/old_models/treated/wta_tournaments.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/model/atp_clustering_input.sql" dialect="GenericSQL" />
-    <file url="file://$PROJECT_DIR$/dbt_tennis/models/model/atp_input.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_matches.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_matches_count.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_odds.sql" dialect="GenericSQL" />

@@ -41,12 +41,12 @@ atp_serve_dependency_clusters as (
   select * from {{ source('raw_layer', 'atp_serve_dependency_clusters') }}
 ),
 
-atp_rally_aggression_cluster as (
-  select * from {{ source('raw_layer', 'atp_rally_aggression_cluster') }}
+atp_rally_aggression_clusters as (
+  select * from {{ source('raw_layer', 'atp_rally_aggression_clusters') }}
 ),
 
-atp_net_points_cluster as (
-  select * from {{ source('raw_layer', 'atp_net_points_cluster') }}
+atp_net_points_clusters as (
+  select * from {{ source('raw_layer', 'atp_net_points_clusters') }}
 ),
 
 final as (
@@ -123,12 +123,12 @@ final as (
 --       left join rankings_atp as r2 on m.player_2_id = r2.player_id
 --         and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
       left join rounds as r on m.round_id = r.round_id
-      left join atp_serve_dependency_clusters as cs1 on p1.player_name = cs.player_name
-      left join atp_serve_dependency_clusters as cs2 on p2.player_name = cs.player_name
-      left join atp_rally_aggression_cluster as cr1 on p1.player_name = cr.player_name
-      left join atp_rally_aggression_cluster as cr2 on p2.player_name = cr.player_name
-      left join atp_net_points_cluster as cn1 on p1.player_name = cn.player_name
-      left join atp_net_points_cluster as cn2 on p2.player_name = cn.player_name
+      left join atp_serve_dependency_clusters as cs1 on p1.player_name = cs1.player_name
+      left join atp_serve_dependency_clusters as cs2 on p2.player_name = cs2.player_name
+      left join atp_rally_aggression_clusters as cr1 on p1.player_name = cr1.player_name
+      left join atp_rally_aggression_clusters as cr2 on p2.player_name = cr2.player_name
+      left join atp_net_points_clusters as cn1 on p1.player_name = cn1.player_name
+      left join atp_net_points_clusters as cn2 on p2.player_name = cn2.player_name
 
     where extract(year from m.match_date) >= 2015
 )

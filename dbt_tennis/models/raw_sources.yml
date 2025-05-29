@@ -31,6 +31,10 @@ sources:
       - name: flashscore_stats_scraped
       - name: flashscore_stats_manual
       - name: atp_predictions
+      - name: atp_serve_dependency_clusters
+      - name: atp_rally_aggression_clusters
+      - name: atp_net_points_clusters
+
 #       - name: wta_predictions
 #       - name: atp_last_52_serve
 #       - name: atp_last_52_return
