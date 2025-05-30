@@ -79,6 +79,10 @@ clusters as (
 roi_data as (
   select
     player_name,
+    -- Overall ROIs (against all opponents)
+    overall_match_win_roi,
+    overall_plus_handicap_roi,
+    overall_minus_handicap_roi,
     -- Rally clusters
     roi_vs_rally1_match, roi_vs_rally1_plus_handicap, roi_vs_rally1_minus_handicap,
     roi_vs_rally2_match, roi_vs_rally2_plus_handicap, roi_vs_rally2_minus_handicap,
@@ -88,11 +92,13 @@ roi_data as (
     roi_vs_net1_match, roi_vs_net1_plus_handicap, roi_vs_net1_minus_handicap,
     roi_vs_net2_match, roi_vs_net2_plus_handicap, roi_vs_net2_minus_handicap,
     roi_vs_net3_match, roi_vs_net3_plus_handicap, roi_vs_net3_minus_handicap,
+    roi_vs_net4_match, roi_vs_net4_plus_handicap, roi_vs_net4_minus_handicap,
     -- Serve clusters
     roi_vs_serve1_match, roi_vs_serve1_plus_handicap, roi_vs_serve1_minus_handicap,
     roi_vs_serve2_match, roi_vs_serve2_plus_handicap, roi_vs_serve2_minus_handicap,
     roi_vs_serve3_match, roi_vs_serve3_plus_handicap, roi_vs_serve3_minus_handicap,
     roi_vs_serve4_match, roi_vs_serve4_plus_handicap, roi_vs_serve4_minus_handicap,
+    roi_vs_serve5_match, roi_vs_serve5_plus_handicap, roi_vs_serve5_minus_handicap,
     -- Special conditions
     grand_slam_match_win_roi, grand_slam_plus_handicap_roi, grand_slam_minus_handicap_roi,
     home_match_win_roi, home_plus_handicap_roi, home_minus_handicap_roi
@@ -137,6 +143,12 @@ match_clusters as (
 roi_enhancements as (
   select
     mc.*,
+
+    -- NEW: Overall ROIs for Player 1
+    r1.overall_match_win_roi as p1_overall_match_roi,
+    r1.overall_plus_handicap_roi as p1_overall_plus_handicap_roi,
+    r1.overall_minus_handicap_roi as p1_overall_minus_handicap_roi,
+
     -- Player 1 ROI against Player 2's clusters
     case p2_rally_cluster
       when 1 then r1.roi_vs_rally1_match
@@ -149,6 +161,7 @@ roi_enhancements as (
       when 1 then r1.roi_vs_net1_match
       when 2 then r1.roi_vs_net2_match
       when 3 then r1.roi_vs_net3_match
+      when 4 then r1.roi_vs_net4_match
     end as p1_roi_vs_p2_net,
 
     case p2_serve_cluster
@@ -156,7 +169,13 @@ roi_enhancements as (
       when 2 then r1.roi_vs_serve2_match
       when 3 then r1.roi_vs_serve3_match
       when 4 then r1.roi_vs_serve4_match
+      when 5 then r1.roi_vs_serve5_match
     end as p1_roi_vs_p2_serve,
+
+     -- NEW: Overall ROIs for Player 1
+    r2.overall_match_win_roi as p2_overall_match_roi,
+    r2.overall_plus_handicap_roi as p2_overall_plus_handicap_roi,
+    r2.overall_minus_handicap_roi as p2_overall_minus_handicap_roi,
 
     -- Player 2 ROI against Player 1's clusters
     case p1_rally_cluster
@@ -170,6 +189,7 @@ roi_enhancements as (
       when 1 then r2.roi_vs_net1_match
       when 2 then r2.roi_vs_net2_match
       when 3 then r2.roi_vs_net3_match
+      when 4 then r2.roi_vs_net4_match
     end as p2_roi_vs_p1_net,
 
     case p1_serve_cluster
@@ -177,7 +197,9 @@ roi_enhancements as (
       when 2 then r2.roi_vs_serve2_match
       when 3 then r2.roi_vs_serve3_match
       when 4 then r2.roi_vs_serve4_match
+      when 5 then r2.roi_vs_serve5_match
     end as p2_roi_vs_p1_serve,
+
 
     -- Special condition ROIs
     r1.grand_slam_match_win_roi as p1_grand_slam_roi,
@@ -200,35 +222,44 @@ select
         p1_model_prob - p1_implied_prob,
         p2_model_prob - p2_implied_prob
         ) as diff,
-  p1_pinnacle_odds,
-  p2_pinnacle_odds,
+  round(p1_pinnacle_odds, 2) as p1_pinnacle_odds,
+  round(p2_pinnacle_odds, 2) as p2_pinnacle_odds,
 --   p1_implied_prob,
 --   p2_implied_prob,
 --   p1_model_prob,
 --   p2_model_prob,
-  p1_model_odds,
-  p2_model_odds,
+  round(p1_model_odds, 2) as p1_model_odds,
+  round(p2_model_odds, 2) as p2_model_odds,
 
-  -- Cluster information
-  p1_rally_cluster,
-  p1_net_cluster,
-  p1_serve_cluster,
-  p2_rally_cluster,
-  p2_net_cluster,
-  p2_serve_cluster,
+--   -- Cluster information
+--   p1_rally_cluster,
+--   p1_net_cluster,
+--   p1_serve_cluster,
+--   p2_rally_cluster,
+--   p2_net_cluster,
+--   p2_serve_cluster,
+
+-- NEW: Overall ROI metrics
+  round(p1_overall_match_roi, 2) as p1_overall_match_roi,
+--   round(p1_overall_plus_handicap_roi, 2) as p1_overall_plus_handicap_roi,
+--   round(p1_overall_minus_handicap_roi, 2) as p1_overall_minus_handicap_roi,
+  round(p2_overall_match_roi, 2) as p2_overall_match_roi,
+--   round(p2_overall_plus_handicap_roi, 2) as p2_overall_plus_handicap_roi,
+--   round(p2_overall_minus_handicap_roi, 2) as p2_overall_minus_handicap_roi,
+
 
   -- ROI metrics
-  p1_roi_vs_p2_rally,
-  p1_roi_vs_p2_net,
-  p1_roi_vs_p2_serve,
-  p2_roi_vs_p1_rally,
-  p2_roi_vs_p1_net,
-  p2_roi_vs_p1_serve,
+  round(p1_roi_vs_p2_rally, 2) as p1_roi_vs_p2_rally,
+  round(p1_roi_vs_p2_net, 2) as p1_roi_vs_p2_net,
+  round(p1_roi_vs_p2_serve, 2) as p1_roi_vs_p2_serve,
+  round(p2_roi_vs_p1_rally, 2) as p2_roi_vs_p1_rally,
+  round(p2_roi_vs_p1_net, 2) as p2_roi_vs_p1_net,
+  round(p2_roi_vs_p1_serve, 2) as p2_roi_vs_p1_serve,
 
   -- Special condition ROIs
-  p1_grand_slam_roi,
-  p2_grand_slam_roi,
-  p1_home_roi,
-  p2_home_roi
+  round(p1_grand_slam_roi, 2) as p1_grand_slam_roi,
+  round(p2_grand_slam_roi, 2) as p2_grand_slam_roi,
+  round(p1_home_roi, 2) as p1_home_roi,
+  round(p2_home_roi, 2) as p2_home_roi
 
 from roi_enhancements

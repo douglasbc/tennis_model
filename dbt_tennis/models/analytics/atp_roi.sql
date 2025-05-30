@@ -86,7 +86,7 @@ bet_calculations as (
       end as plus_handicap_profit,
 
     -- minus handicap calculation (giving away games)
-    case when handicap_line > 0 then
+    case when handicap_line < 0 then
       case
         when (games_won + handicap_line) = games_against then 0
         when (games_won + handicap_line) > games_against then handicap_odds -1
@@ -96,12 +96,13 @@ bet_calculations as (
      -- flags for special conditions
     case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
     case when player_country = tournament_country then 1 else 0 end as is_home_country
-  from match_data
+  from (select * from match_data where match_win_odds is not null)
 ),
 
 roi_aggregations as (
   select
     player_name,
+
     opponent_rally_cluster,
     opponent_net_cluster,
     opponent_serve_cluster,
@@ -136,6 +137,11 @@ roi_aggregations as (
 pivoted_roi AS (
   SELECT
     player_name,
+
+  -- Overall ROIs
+  sum(total_match_win_profit) / nullif(sum(total_matches), 0) * 100 as overall_match_win_roi,
+  sum(total_plus_handicap_profit) / nullif(sum(plus_handicap_matches), 0) * 100 as overall_plus_handicap_roi,
+  sum(total_minus_handicap_profit) / nullif(sum(minus_handicap_matches), 0) * 100 as overall_minus_handicap_roi,
 
     -- Rally Aggression Clusters (1-4)
     -- Cluster 1

@@ -86,7 +86,7 @@ bet_calculations as (
       end as plus_handicap_profit,
 
     -- minus handicap calculation (giving away games)
-    case when handicap_line > 0 then
+    case when handicap_line < 0 then
       case
         when (games_won + handicap_line) = games_against then 0
         when (games_won + handicap_line) > games_against then handicap_odds -1
@@ -96,12 +96,13 @@ bet_calculations as (
      -- flags for special conditions
     case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
     case when player_country = tournament_country then 1 else 0 end as is_home_country
-  from match_data
+  from (select * from match_data where match_win_odds is not null)
 ),
 
 roi_aggregations as (
   select
     player_name,
+
     opponent_rally_cluster,
     opponent_net_cluster,
     opponent_serve_cluster,
@@ -137,6 +138,11 @@ pivoted_roi AS (
   SELECT
     player_name,
 
+  -- Overall ROIs
+  sum(total_match_win_profit) / nullif(sum(total_matches), 0) * 100 as overall_match_win_roi,
+  sum(total_plus_handicap_profit) / nullif(sum(plus_handicap_matches), 0) * 100 as overall_plus_handicap_roi,
+  sum(total_minus_handicap_profit) / nullif(sum(minus_handicap_matches), 0) * 100 as overall_minus_handicap_roi,
+
     -- Rally Aggression Clusters (1-4)
     -- Cluster 1
     SUM(IF(opponent_rally_cluster = 1, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 1, total_matches, 0)), 0) * 100 AS roi_vs_rally1_match,
@@ -170,7 +176,7 @@ pivoted_roi AS (
     SUM(IF(opponent_rally_cluster = 4, plus_handicap_matches, 0)) AS plus_handicap_vs_rally4,
     SUM(IF(opponent_rally_cluster = 4, minus_handicap_matches, 0)) AS minus_handicap_vs_rally4,
 
-    -- Net Points Clusters (1-3)
+    -- Net Points Clusters (1-4)
     -- Cluster 1
     SUM(IF(opponent_net_cluster = 1, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 1, total_matches, 0)), 0) * 100 AS roi_vs_net1_match,
     SUM(IF(opponent_net_cluster = 1, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 1, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_net1_plus_handicap,
@@ -195,7 +201,15 @@ pivoted_roi AS (
     SUM(IF(opponent_net_cluster = 3, plus_handicap_matches, 0)) AS plus_handicap_vs_net3,
     SUM(IF(opponent_net_cluster = 3, minus_handicap_matches, 0)) AS minus_handicap_vs_net3,
 
-    -- Serve Dependency Clusters (1-4)
+    -- Cluster 4
+    SUM(IF(opponent_net_cluster = 4, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 4, total_matches, 0)), 0) * 100 AS roi_vs_net4_match,
+    SUM(IF(opponent_net_cluster = 4, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 4, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_net4_plus_handicap,
+    SUM(IF(opponent_net_cluster = 4, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 4, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_net4_minus_handicap,
+    SUM(IF(opponent_net_cluster = 4, total_matches, 0)) AS matches_vs_net4,
+    SUM(IF(opponent_net_cluster = 4, plus_handicap_matches, 0)) AS plus_handicap_vs_net4,
+    SUM(IF(opponent_net_cluster = 4, minus_handicap_matches, 0)) AS minus_handicap_vs_net4,
+
+    -- Serve Dependency Clusters (1-5)
     -- Cluster 1
     SUM(IF(opponent_serve_cluster = 1, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 1, total_matches, 0)), 0) * 100 AS roi_vs_serve1_match,
     SUM(IF(opponent_serve_cluster = 1, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 1, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve1_plus_handicap,
@@ -227,6 +241,14 @@ pivoted_roi AS (
     SUM(IF(opponent_serve_cluster = 4, total_matches, 0)) AS matches_vs_serve4,
     SUM(IF(opponent_serve_cluster = 4, plus_handicap_matches, 0)) AS plus_handicap_vs_serve4,
     SUM(IF(opponent_serve_cluster = 4, minus_handicap_matches, 0)) AS minus_handicap_vs_serve4,
+
+    -- Cluster 5
+    SUM(IF(opponent_serve_cluster = 5, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 5, total_matches, 0)), 0) * 100 AS roi_vs_serve5_match,
+    SUM(IF(opponent_serve_cluster = 5, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 5, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve5_plus_handicap,
+    SUM(IF(opponent_serve_cluster = 5, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 5, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve5_minus_handicap,
+    SUM(IF(opponent_serve_cluster = 5, total_matches, 0)) AS matches_vs_serve5,
+    SUM(IF(opponent_serve_cluster = 5, plus_handicap_matches, 0)) AS plus_handicap_vs_serve5,
+    SUM(IF(opponent_serve_cluster = 5, minus_handicap_matches, 0)) AS minus_handicap_vs_serve5,
 
     -- Grand Slam Performance
     SUM(grand_slam_match_win_profit) / NULLIF(SUM(grand_slam_matches), 0) * 100 AS grand_slam_match_win_roi,
