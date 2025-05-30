@@ -57,7 +57,7 @@ def get_todays_matches(tour):
                               select distinct p2_name as player
                               from `tennis-358702.model.{tour}_model_input`
                             )
-                            select * from `tennis-358702.model.{tour}_today`
+                            select * from `tennis-358702.silver.{tour}_today`
                             where
                               p1_name in (select player from players_fitted)
                               and p2_name in (select player from players_fitted)
