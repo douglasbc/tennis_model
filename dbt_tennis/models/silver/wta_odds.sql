@@ -6,7 +6,7 @@
 with 
 
 odds as (
-  select * from {{ source('raw_layer', 'odds_atp') }}
+  select * from {{ source('raw_layer', 'odds_wta') }}
 ),
 
 pinnacle_odds as (

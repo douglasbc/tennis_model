@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/buffer/checks/new_match_charting_repo_name.sql" dialect="BigQuery" />
+    <file url="file://$PROJECT_DIR$/buffer/ds.sql" dialect="BigQuery" />
     <file url="file://$PROJECT_DIR$/buffer/old_models/analytics/atp_player_cluster_roi.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/buffer/old_models/analytics/matches_atp.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/buffer/old_models/analytics/matches_wta.sql" dialect="GenericSQL" />
@@ -46,5 +48,7 @@
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_stats.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_today.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_tournaments.sql" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/dbt_tennis/target/run/dbt_tennis/models/analytics/atp_roi_v.sql" dialect="BigQuery" />
+    <file url="PROJECT" dialect="BigQuery" />
   </component>
 </project>

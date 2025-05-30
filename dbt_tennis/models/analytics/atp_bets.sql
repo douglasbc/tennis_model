@@ -1,0 +1,240 @@
+{{ config(
+    materialized = 'table',
+    schema = 'analytics',
+)}}
+
+with
+
+fix_player_names as (
+  select * from {{ source('raw_layer', 'fix_player_names') }}
+),
+
+pinnacle_odds as (
+  select
+    event_id,
+    tournament_round,
+--     datetime_sub(match_start_at, interval 3 hour) as match_start_at,
+    match_start_at,
+    coalesce(f1.oncourt_name, p1_name) as p1_name,
+    coalesce(f2.oncourt_name, p2_name) as p2_name,
+    p1_pinnacle_odds,
+    p2_pinnacle_odds,
+    1/p1_pinnacle_odds as p1_pinnacle_odds_p,
+    1/p2_pinnacle_odds as p2_pinnacle_odds_p,
+  from {{ source('raw_layer', 'pinnacle_odds') }} as p
+    left join fix_player_names as f1 on p.p1_name = f1.pinnacle_name
+    left join fix_player_names as f2 on p.p2_name = f2.pinnacle_name
+  where resulting_unit = 'Sets'
+    and event_type = 'prematch'
+    and p1_pinnacle_odds is not null
+    and tournament_round not like '%Doubles%'
+),
+
+atp_predictions as (
+  select * from {{ source('raw_layer', 'atp_predictions') }}
+),
+
+atp_serve_dependency_clusters as (
+  select * from {{ source('raw_layer', 'atp_serve_dependency_clusters') }}
+),
+
+atp_rally_aggression_clusters as (
+  select * from {{ source('raw_layer', 'atp_rally_aggression_clusters') }}
+),
+
+atp_net_points_clusters as (
+  select * from {{ source('raw_layer', 'atp_net_points_clusters') }}
+),
+
+atp_roi as (
+  select * from {{ ref('atp_roi') }}
+),
+
+atp_matches_count as (
+  select * from {{ ref('atp_matches_count') }}
+),
+
+predictions as (
+  select
+    p1_name,
+    p2_name,
+    p1_probability as p1_model_p,
+    p2_probability as p2_model_p,
+    p1_fair_odds as p1_model_odds,
+    p2_fair_odds as p2_model_odds
+  from atp_predictions
+),
+
+clusters as (
+  select
+    s.player_name,
+    s.best_cluster as serve_cluster,
+    r.best_cluster as rally_cluster,
+    n.best_cluster as net_cluster
+  from atp_serve_dependency_clusters s
+  left join atp_net_points_clusters n on s.player_name = n.player_name
+  left join atp_rally_aggression_clusters r on s.player_name = r.player_name
+),
+
+roi_data as (
+  select
+    player_name,
+    -- Rally clusters
+    roi_vs_rally1_match, roi_vs_rally1_plus_handicap, roi_vs_rally1_minus_handicap,
+    roi_vs_rally2_match, roi_vs_rally2_plus_handicap, roi_vs_rally2_minus_handicap,
+    roi_vs_rally3_match, roi_vs_rally3_plus_handicap, roi_vs_rally3_minus_handicap,
+    roi_vs_rally4_match, roi_vs_rally4_plus_handicap, roi_vs_rally4_minus_handicap,
+    -- Net clusters
+    roi_vs_net1_match, roi_vs_net1_plus_handicap, roi_vs_net1_minus_handicap,
+    roi_vs_net2_match, roi_vs_net2_plus_handicap, roi_vs_net2_minus_handicap,
+    roi_vs_net3_match, roi_vs_net3_plus_handicap, roi_vs_net3_minus_handicap,
+    roi_vs_net4_match, roi_vs_net4_plus_handicap, roi_vs_net4_minus_handicap,
+    -- Serve clusters
+    roi_vs_serve1_match, roi_vs_serve1_plus_handicap, roi_vs_serve1_minus_handicap,
+    roi_vs_serve2_match, roi_vs_serve2_plus_handicap, roi_vs_serve2_minus_handicap,
+    roi_vs_serve3_match, roi_vs_serve3_plus_handicap, roi_vs_serve3_minus_handicap,
+    roi_vs_serve4_match, roi_vs_serve4_plus_handicap, roi_vs_serve4_minus_handicap,
+    roi_vs_serve5_match, roi_vs_serve5_plus_handicap, roi_vs_serve5_minus_handicap,
+    -- Special conditions
+    grand_slam_match_win_roi, grand_slam_plus_handicap_roi, grand_slam_minus_handicap_roi,
+    home_match_win_roi, home_plus_handicap_roi, home_minus_handicap_roi
+  from atp_roi
+),
+
+base_matches as (
+  select
+    po.event_id,
+    po.tournament_round,
+    datetime_sub(po.match_start_at, interval 3 hour) as match_start_at,
+    po.p1_name,
+    po.p2_name,
+    po.p1_pinnacle_odds,
+    po.p2_pinnacle_odds,
+    1/po.p1_pinnacle_odds as p1_implied_prob,
+    1/po.p2_pinnacle_odds as p2_implied_prob,
+    ap.p1_probability as p1_model_prob,
+    ap.p2_probability as p2_model_prob,
+    ap.p1_fair_odds as p1_model_odds,
+    ap.p2_fair_odds as p2_model_odds
+  from pinnacle_odds po
+  left join atp_predictions ap
+    on po.p1_name = ap.p1_name
+    and po.p2_name = ap.p2_name
+),
+
+match_clusters as (
+  select
+    bm.*,
+    c1.rally_cluster as p1_rally_cluster,
+    c1.net_cluster as p1_net_cluster,
+    c1.serve_cluster as p1_serve_cluster,
+    c2.rally_cluster as p2_rally_cluster,
+    c2.net_cluster as p2_net_cluster,
+    c2.serve_cluster as p2_serve_cluster
+  from base_matches bm
+  join clusters c1 on bm.p1_name = c1.player_name
+  join clusters c2 on bm.p2_name = c2.player_name
+),
+
+roi_enhancements as (
+  select
+    mc.*,
+    -- Player 1 ROI against Player 2's clusters
+    case p2_rally_cluster
+      when 1 then r1.roi_vs_rally1_match
+      when 2 then r1.roi_vs_rally2_match
+      when 3 then r1.roi_vs_rally3_match
+      when 4 then r1.roi_vs_rally4_match
+    end as p1_roi_vs_p2_rally,
+
+    case p2_net_cluster
+      when 1 then r1.roi_vs_net1_match
+      when 2 then r1.roi_vs_net2_match
+      when 3 then r1.roi_vs_net3_match
+      when 4 then r1.roi_vs_net4_match
+    end as p1_roi_vs_p2_net,
+
+    case p2_serve_cluster
+      when 1 then r1.roi_vs_serve1_match
+      when 2 then r1.roi_vs_serve2_match
+      when 3 then r1.roi_vs_serve3_match
+      when 4 then r1.roi_vs_serve4_match
+      when 5 then r1.roi_vs_serve5_match
+    end as p1_roi_vs_p2_serve,
+
+    -- Player 2 ROI against Player 1's clusters
+    case p1_rally_cluster
+      when 1 then r2.roi_vs_rally1_match
+      when 2 then r2.roi_vs_rally2_match
+      when 3 then r2.roi_vs_rally3_match
+      when 4 then r2.roi_vs_rally4_match
+    end as p2_roi_vs_p1_rally,
+
+    case p1_net_cluster
+      when 1 then r2.roi_vs_net1_match
+      when 2 then r2.roi_vs_net2_match
+      when 3 then r2.roi_vs_net3_match
+      when 4 then r2.roi_vs_net4_match
+    end as p2_roi_vs_p1_net,
+
+    case p1_serve_cluster
+      when 1 then r2.roi_vs_serve1_match
+      when 2 then r2.roi_vs_serve2_match
+      when 3 then r2.roi_vs_serve3_match
+      when 4 then r2.roi_vs_serve4_match
+      when 5 then r2.roi_vs_serve5_match
+    end as p2_roi_vs_p1_serve,
+
+    -- Special condition ROIs
+    r1.grand_slam_match_win_roi as p1_grand_slam_roi,
+    r2.grand_slam_match_win_roi as p2_grand_slam_roi,
+    r1.home_match_win_roi as p1_home_roi,
+    r2.home_match_win_roi as p2_home_roi
+
+  from match_clusters mc
+  left join roi_data r1 on mc.p1_name = r1.player_name
+  left join roi_data r2 on mc.p2_name = r2.player_name
+)
+
+select
+--   event_id,
+  tournament_round,
+  match_start_at,
+  p1_name,
+  p2_name,
+  100*greatest(
+        p1_model_prob - p1_implied_prob,
+        p2_model_prob - p2_implied_prob
+        ) as diff,
+  p1_pinnacle_odds,
+  p2_pinnacle_odds,
+--   p1_implied_prob,
+--   p2_implied_prob,
+--   p1_model_prob,
+--   p2_model_prob,
+  p1_model_odds,
+  p2_model_odds,
+
+  -- Cluster information
+  p1_rally_cluster,
+  p1_net_cluster,
+  p1_serve_cluster,
+  p2_rally_cluster,
+  p2_net_cluster,
+  p2_serve_cluster,
+
+  -- ROI metrics
+  p1_roi_vs_p2_rally,
+  p1_roi_vs_p2_net,
+  p1_roi_vs_p2_serve,
+  p2_roi_vs_p1_rally,
+  p2_roi_vs_p1_net,
+  p2_roi_vs_p1_serve,
+
+  -- Special condition ROIs
+  p1_grand_slam_roi,
+  p2_grand_slam_roi,
+  p1_home_roi,
+  p2_home_roi
+
+from roi_enhancements

@@ -10,43 +10,43 @@
 
 with 
 
-matches_atp as (
+matches_wta as (
   select
     to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id,
     *
-  from {{ source('raw_layer', 'matches_atp') }}
+  from {{ source('raw_layer', 'matches_wta') }}
 ),
 
-atp_players as (
-  select * from {{ ref('atp_players') }}
+wta_players as (
+  select * from {{ ref('wta_players') }}
 ),
 
-atp_tournaments as (
-  select * from {{ ref('atp_tournaments') }}
+wta_tournaments as (
+  select * from {{ ref('wta_tournaments') }}
 ),
 
-atp_stats as (
-  select * from {{ ref('atp_stats') }}
+wta_stats as (
+  select * from {{ ref('wta_stats') }}
 ),
 
-atp_odds as (
-  select * from {{ ref('atp_odds') }}
+wta_odds as (
+  select * from {{ ref('wta_odds') }}
 ),
 
 rounds as (
   select * from {{ source('raw_layer', 'rounds') }}
 ),
 
-atp_serve_dependency_clusters as (
-  select * from {{ source('raw_layer', 'atp_serve_dependency_clusters') }}
+wta_serve_dependency_clusters as (
+  select * from {{ source('raw_layer', 'wta_serve_dependency_clusters') }}
 ),
 
-atp_rally_aggression_clusters as (
-  select * from {{ source('raw_layer', 'atp_rally_aggression_clusters') }}
+wta_rally_aggression_clusters as (
+  select * from {{ source('raw_layer', 'wta_rally_aggression_clusters') }}
 ),
 
-atp_net_points_clusters as (
-  select * from {{ source('raw_layer', 'atp_net_points_clusters') }}
+wta_net_points_clusters as (
+  select * from {{ source('raw_layer', 'wta_net_points_clusters') }}
 ),
 
 final as (
@@ -110,28 +110,28 @@ final as (
       cr2.best_cluster as p2_rally_aggression_cluster,
       cn1.best_cluster as p1_net_points_cluster,
       cn2.best_cluster as p2_net_points_cluster
-    from matches_atp as m
-      inner join atp_players as p1 on m.player_1_id = p1.player_id
-      inner join atp_players as p2 on m.player_2_id = p2.player_id
-      inner join atp_tournaments as t on m.tournament_id = t.tournament_id
+    from matches_wta as m
+      inner join wta_players as p1 on m.player_1_id = p1.player_id
+      inner join wta_players as p2 on m.player_2_id = p2.player_id
+      inner join wta_tournaments as t on m.tournament_id = t.tournament_id
 --       left join historical_weather as w on (m.match_date = w.local_date and t.geo_id = w.geo_id)
---       left join atp_entry as e1 on (m.player_1_id = e1.player_id and m.tournament_id = e1.tournament_id)
---       left join atp_entry as e2 on (m.player_2_id = e2.player_id and m.tournament_id = e2.tournament_id)
-      left join atp_stats as s on m.match_id = s.match_id
---       left join atp_odds as o on m.match_id = o.match_id
-      left join atp_odds as o1 on m.match_id = o1.match_id_1
-      left join atp_odds as o2 on m.match_id = o2.match_id_2
---       left join rankings_atp as r1 on m.player_1_id = r1.player_id
+--       left join wta_entry as e1 on (m.player_1_id = e1.player_id and m.tournament_id = e1.tournament_id)
+--       left join wta_entry as e2 on (m.player_2_id = e2.player_id and m.tournament_id = e2.tournament_id)
+      left join wta_stats as s on m.match_id = s.match_id
+--       left join wta_odds as o on m.match_id = o.match_id
+      left join wta_odds as o1 on m.match_id = o1.match_id_1
+      left join wta_odds as o2 on m.match_id = o2.match_id_2
+--       left join rankings_wta as r1 on m.player_1_id = r1.player_id
 --         and m.match_date between r1.ranking_date and date_add(r1.ranking_date, interval 6 day)
---       left join rankings_atp as r2 on m.player_2_id = r2.player_id
+--       left join rankings_wta as r2 on m.player_2_id = r2.player_id
 --         and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
       left join rounds as r on m.round_id = r.round_id
-      left join atp_serve_dependency_clusters as cs1 on p1.player_name = cs1.player_name
-      left join atp_serve_dependency_clusters as cs2 on p2.player_name = cs2.player_name
-      left join atp_rally_aggression_clusters as cr1 on p1.player_name = cr1.player_name
-      left join atp_rally_aggression_clusters as cr2 on p2.player_name = cr2.player_name
-      left join atp_net_points_clusters as cn1 on p1.player_name = cn1.player_name
-      left join atp_net_points_clusters as cn2 on p2.player_name = cn2.player_name
+      left join wta_serve_dependency_clusters as cs1 on p1.player_name = cs1.player_name
+      left join wta_serve_dependency_clusters as cs2 on p2.player_name = cs2.player_name
+      left join wta_rally_aggression_clusters as cr1 on p1.player_name = cr1.player_name
+      left join wta_rally_aggression_clusters as cr2 on p2.player_name = cr2.player_name
+      left join wta_net_points_clusters as cn1 on p1.player_name = cn1.player_name
+      left join wta_net_points_clusters as cn2 on p2.player_name = cn2.player_name
 
     where extract(year from m.match_date) >= 2015
 )
