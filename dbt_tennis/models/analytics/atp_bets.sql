@@ -54,17 +54,6 @@ atp_matches_count as (
   select * from {{ ref('atp_matches_count') }}
 ),
 
-predictions as (
-  select
-    p1_name,
-    p2_name,
-    p1_probability as p1_model_p,
-    p2_probability as p2_model_p,
-    p1_fair_odds as p1_model_odds,
-    p2_fair_odds as p2_model_odds
-  from atp_predictions
-),
-
 clusters as (
   select
     s.player_name,
@@ -83,6 +72,18 @@ roi_data as (
     overall_match_win_roi,
     overall_plus_handicap_roi,
     overall_minus_handicap_roi,
+
+    -- NEW: Against left-handed opponents
+    vs_left_handed_match_roi,
+    vs_left_handed_plus_handicap_roi,
+    vs_left_handed_minus_handicap_roi,
+
+    -- Surface ROIs
+    clay_match_win_roi, clay_plus_handicap_roi, clay_minus_handicap_roi,
+    grass_match_win_roi, grass_plus_handicap_roi, grass_minus_handicap_roi,
+    hard_match_win_roi, hard_plus_handicap_roi, hard_minus_handicap_roi,
+    indoor_hard_match_win_roi, indoor_hard_plus_handicap_roi, indoor_hard_minus_handicap_roi,
+
     -- Rally clusters
     roi_vs_rally1_match, roi_vs_rally1_plus_handicap, roi_vs_rally1_minus_handicap,
     roi_vs_rally2_match, roi_vs_rally2_plus_handicap, roi_vs_rally2_minus_handicap,
@@ -109,6 +110,7 @@ base_matches as (
   select
     po.event_id,
     po.tournament_round,
+    ap.surface,
     datetime_sub(po.match_start_at, interval 3 hour) as match_start_at,
     po.p1_name,
     po.p2_name,
@@ -148,6 +150,27 @@ roi_enhancements as (
     r1.overall_match_win_roi as p1_overall_match_roi,
     r1.overall_plus_handicap_roi as p1_overall_plus_handicap_roi,
     r1.overall_minus_handicap_roi as p1_overall_minus_handicap_roi,
+
+    -- NEW: Left-handed ROIs
+    r1.vs_left_handed_match_roi as p1_vs_left_handed_roi,
+    r2.vs_left_handed_match_roi as p2_vs_left_handed_roi,
+
+    -- NEW: Surface ROIs
+    case
+      when surface = 'Clay' then r1.clay_match_win_roi
+      when surface = 'Grass' then r1.grass_match_win_roi
+      when surface = 'Hard' then r1.hard_match_win_roi
+      when surface = 'Indoor Hard' then r1.indoor_hard_match_win_roi
+      else null
+    end as p1_surface_roi,
+
+    case
+      when surface = 'Clay' then r2.clay_match_win_roi
+      when surface = 'Grass' then r2.grass_match_win_roi
+      when surface = 'Hard' then r2.hard_match_win_roi
+      when surface = 'Indoor Hard' then r2.indoor_hard_match_win_roi
+      else null
+    end as p2_surface_roi,
 
     -- Player 1 ROI against Player 2's clusters
     case p2_rally_cluster
@@ -241,11 +264,19 @@ select
 
 -- NEW: Overall ROI metrics
   round(p1_overall_match_roi, 2) as p1_overall_match_roi,
---   round(p1_overall_plus_handicap_roi, 2) as p1_overall_plus_handicap_roi,
---   round(p1_overall_minus_handicap_roi, 2) as p1_overall_minus_handicap_roi,
+  round(p1_overall_plus_handicap_roi, 2) as p1_overall_plus_handicap_roi,
+  round(p1_overall_minus_handicap_roi, 2) as p1_overall_minus_handicap_roi,
   round(p2_overall_match_roi, 2) as p2_overall_match_roi,
---   round(p2_overall_plus_handicap_roi, 2) as p2_overall_plus_handicap_roi,
---   round(p2_overall_minus_handicap_roi, 2) as p2_overall_minus_handicap_roi,
+  round(p2_overall_plus_handicap_roi, 2) as p2_overall_plus_handicap_roi,
+  round(p2_overall_minus_handicap_roi, 2) as p2_overall_minus_handicap_roi,
+
+  -- NEW: Left-handed metrics
+  round(p1_vs_left_handed_roi, 2) as p1_vs_left_handed_roi,
+  round(p2_vs_left_handed_roi, 2) as p2_vs_left_handed_roi,
+
+  -- NEW: Surface metrics
+  round(p1_surface_roi, 2) as p1_surface_roi,
+  round(p2_surface_roi, 2) as p2_surface_roi,
 
 
   -- ROI metrics

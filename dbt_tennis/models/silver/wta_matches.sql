@@ -70,6 +70,8 @@ final as (
 --       w.avg_wind_speed,
       p1.country as p1_country,
       p2.country as p2_country,
+      p1.is_left_handed as p1_is_left_handed,
+      p2.is_left_handed as p2_is_left_handed,
 --       if(e1.entry_status is null, 'Direct Acceptance', e1.entry_status) as p1_entry_status,
 --       e1.seed_number as p1_seed_number,
 --       if(e2.entry_status is null, 'Direct Acceptance', e2.entry_status) as p2_entry_status,
