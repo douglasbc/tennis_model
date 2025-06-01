@@ -1,12 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from google.cloud import bigquery
 from google.oauth2 import service_account
 from datetime import datetime, timedelta
-import time
 
 # Initialize BigQuery client
 def init_bigquery_client():
@@ -41,6 +38,7 @@ def get_matches_data(client, tours, tiers):
     SELECT 
         'ATP' as tour, 
         tournament_tier,
+        tournament_round,
         match_start_at, 
         p1_name, 
         p2_name, 
@@ -64,6 +62,7 @@ def get_matches_data(client, tours, tiers):
     SELECT 
         'WTA' as tour, 
         tournament_tier,
+        tournament_round,
         match_start_at, 
         p1_name, 
         p2_name, 
@@ -162,7 +161,7 @@ def format_roi(roi_value):
     try:
         roi_float = float(roi_value)
         color = "green" if roi_float > 0 else "red" if roi_float < 0 else "gray"
-        return f"<span style='color:{color}; font-weight:bold'>{roi_float:.1f}%</span>"
+        return f"{roi_float:.1f}%"
     except:
         return "N/A"
 
@@ -172,9 +171,8 @@ def format_diff(diff_value):
         return "N/A"
     try:
         diff_float = float(diff_value)
-        color = "green" if diff_float < 0 else "red" if diff_float > 0 else "gray"
         arrow = "↓" if diff_float < 0 else "↑" if diff_float > 0 else ""
-        return f"<span style='color:{color}; font-weight:bold'>{diff_float:.2f}{arrow}</span>"
+        return f"{diff_float:.2f}{arrow}"
     except:
         return "N/A"
 
@@ -193,60 +191,51 @@ def get_surface_roi_column(surface, bet_type="match"):
         "Clay": "clay",
         "Grass": "grass",
         "Hard": "hard",
-        "Carpet": "indoor_hard",  # Map carpet to hard
+        "Carpet": "indoor_hard",
         "Indoor Hard": "indoor_hard"
     }
 
     base = surface_map.get(surface, "hard")
-    if bet_type == "plus":
-        return f"{base}_plus_handicap_roi"
-    elif bet_type == "minus":
-        return f"{base}_minus_handicap_roi"
-    else:
-        return f"{base}_match_win_roi"
-
-# # Plot player performance over time
-# def plot_player_performance(history, player_name):
-#     if history.empty:
-#         return None
-#
-#     history['match_date'] = pd.to_datetime(history['match_date'])
-#     history = history.sort_values('match_date')
-#
-#     # Calculate cumulative ROI
-#     history['profit'] = history.apply(
-#         lambda row: (row['odds'] - 1) if row['win'] == 1 else -1, axis=1
-#     )
-#     history['cumulative_profit'] = history['profit'].cumsum()
-#     history['cumulative_roi'] = history['cumulative_profit'] / history.index * 100
-#
-#     # Create plot
-#     fig, ax = plt.subplots(figsize=(12, 6))
-#
-#     # Win rate
-#     win_rate = history['win'].expanding().mean().mul(100)
-#     ax.plot(history['match_date'], win_rate, label='Win Rate', color='blue')
-#
-#     # Cumulative ROI
-#     ax2 = ax.twinx()
-#     ax2.plot(history['match_date'], history['cumulative_roi'],
-#             label='Cumulative ROI', color='green')
-#
-#     # Formatting
-#     ax.set_xlabel('Date')
-#     ax.set_ylabel('Win Rate (%)', color='blue')
-#     ax2.set_ylabel('Cumulative ROI (%)', color='green')
-#     ax.set_title(f'{player_name} Performance Over Time')
-#     ax.grid(True, alpha=0.3)
-#
-#     return fig
+    return f"{base}_match_win_roi"
 
 # Format match history with color coding
-# def format_history_row(row):
-#     if row['win'] == 1:
-#         return ['background-color: #d4edda'] * len(row)
-#     else:
-#         return ['background-color: #f8d7da'] * len(row)
+def format_history_row(row):
+    if row['Win'] == 1:
+        return ['background-color: #d4edda'] * len(row)
+    else:
+        return ['background-color: #f8d7da'] * len(row)
+
+# Calculate cluster ROI sum for a player - FIXED SYNTAX
+def calculate_cluster_roi_sum(roi_df, rally_cluster, net_cluster, serve_cluster):
+    if roi_df.empty:
+        return "N/A"
+
+    total = 0
+    count = 0
+
+    if not pd.isna(rally_cluster):
+        col_name = f'roi_vs_rally{rally_cluster}_match'
+        if col_name in roi_df.columns and not pd.isna(roi_df[col_name].iloc[0]):
+            total += float(roi_df[col_name].iloc[0])
+            count += 1
+
+    if not pd.isna(net_cluster):
+        col_name = f'roi_vs_net{net_cluster}_match'
+        if col_name in roi_df.columns and not pd.isna(roi_df[col_name].iloc[0]):
+            total += float(roi_df[col_name].iloc[0])
+            count += 1
+
+    if not pd.isna(serve_cluster):
+        col_name = f'roi_vs_serve{serve_cluster}_match'
+        if col_name in roi_df.columns and not pd.isna(roi_df[col_name].iloc[0]):
+            total += float(roi_df[col_name].iloc[0])
+            count += 1
+
+    if count == 0:
+        return "N/A"
+
+    avg = total / count
+    return f"{avg:.1f}%"
 
 # Main Streamlit app
 def main():
@@ -335,26 +324,46 @@ def main():
         # Create a container for the table
         table_container = st.container()
 
+        # Pre-cache ROI data for all players to avoid repeated queries
+        all_players = set(display_df['p1_name'].tolist() + display_df['p2_name'].tolist())
+        roi_cache = {}
+        with st.spinner("Loading player ROI data..."):
+            for player in all_players:
+                # Determine tour based on which dataset the player appears in
+                tour = "ATP" if player in display_df[display_df['tour'] == "ATP"]['p1_name'].values or \
+                               player in display_df[display_df['tour'] == "ATP"]['p2_name'].values else "WTA"
+                roi_cache[player] = get_player_roi(client, player, tour)
+
         # Display the table with clickable rows
         with table_container:
             # Create a form for each row
             for i, row in display_df.iterrows():
-                # Create columns for the match info
-                cols = st.columns([1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+                # Calculate cluster ROI sums using cached data
+                p1_roi = roi_cache.get(row['p1_name'], pd.DataFrame())
+                p2_roi = roi_cache.get(row['p2_name'], pd.DataFrame())
+
+                p1_cluster_roi = calculate_cluster_roi_sum(p1_roi, row['p2_rally_cluster'], row['p2_net_cluster'], row['p2_serve_cluster'])
+                p2_cluster_roi = calculate_cluster_roi_sum(p2_roi, row['p1_rally_cluster'], row['p1_net_cluster'], row['p1_serve_cluster'])
+
+                # Create columns for the match info - 15 columns total
+                cols = st.columns([0.7, 1.5, 1.0, 0.8, 1.5, 0.5, 1.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8])
 
                 # Display match info in columns
                 cols[0].write(f"**{i+1}**")
                 cols[1].write(f"**{row['Date']}**")
                 cols[2].write(f"**{row['tournament_tier']}**")
-                cols[3].write(f"**{row['p1_name']}**")
-                cols[4].write(f"**vs**")
-                cols[5].write(f"**{row['p2_name']}**")
-                cols[6].write(f"{row['surface']}")
-                cols[7].write(row['Diff'])  # Diff column added here
-                cols[8].write(f"P: {row['P1 Pinnacle']}")
-                cols[9].write(f"M: {row['P1 Model']}")
-                cols[10].write(f"P: {row['P2 Pinnacle']}")
-                cols[11].write(f"M: {row['P2 Model']}")
+                cols[3].write(f"**{row['tournament_round']}**")
+                cols[4].write(f"**{row['p1_name']}**")
+                cols[5].write(f"**vs**")
+                cols[6].write(f"**{row['p2_name']}**")
+                cols[7].write(f"{row['surface']}")
+                cols[8].write(row['Diff'])
+                cols[9].write(f"P: {row['P1 Pinnacle']}")
+                cols[10].write(f"M: {row['P1 Model']}")
+                cols[11].write(f"P: {row['P2 Pinnacle']}")
+                cols[12].write(f"M: {row['P2 Model']}")
+                cols[13].write(f"{p1_cluster_roi}")
+                cols[14].write(f"{p2_cluster_roi}")
 
                 # Add a button to select the match
                 if cols[0].button("Select", key=f"select_{i}"):
@@ -383,11 +392,13 @@ def main():
             p2_rally = match_details["p2_rally_cluster"]
             p2_net = match_details["p2_net_cluster"]
             p2_serve = match_details["p2_serve_cluster"]
+            is_grand_slam = match_details["tournament_tier"] == "Grand Slam"
+            tournament_round = match_details["tournament_round"]
 
             # Display detailed match analysis
             st.divider()
             st.subheader(f"{p1_name} vs {p2_name} - {surface}")
-            st.caption(f"{match_time.strftime('%Y-%m-%d %H:%M')} | {tour}")
+            st.caption(f"{match_time.strftime('%Y-%m-%d %H:%M')} | {tour} | {match_details['tournament_tier']} | {tournament_round}")
 
             # Add button to go back to match list
             if st.button("← Back to Match List"):
@@ -433,26 +444,19 @@ def main():
 
                 if not p1_roi.empty:
                     # Always show overall ROI
-                    st.markdown(f"**Overall Match ROI:** {format_roi(p1_roi['overall_match_win_roi'].iloc[0])}",
-                                unsafe_allow_html=True)
-
-                    # Show handicap ROIs based on odds
-                    if p1_odds > 2.1:
-                        st.markdown(f"**Plus Handicap ROI:** {format_roi(p1_roi['overall_plus_handicap_roi'].iloc[0])}",
-                                    unsafe_allow_html=True)
-                    elif p1_odds < 1.8:
-                        st.markdown(f"**Minus Handicap ROI:** {format_roi(p1_roi['overall_minus_handicap_roi'].iloc[0])}",
-                                    unsafe_allow_html=True)
+                    st.markdown(f"**Overall Match ROI:** {format_roi(p1_roi['overall_match_win_roi'].iloc[0])}")
 
                     # Show surface-specific ROI
                     surface_roi_col = get_surface_roi_column(surface)
-                    st.markdown(f"**{surface} ROI:** {format_roi(p1_roi[surface_roi_col].iloc[0])}",
-                                unsafe_allow_html=True)
+                    st.markdown(f"**{surface} ROI:** {format_roi(p1_roi[surface_roi_col].iloc[0])}")
+
+                    # Show Grand Slam ROI if applicable
+                    if is_grand_slam and 'grand_slam_match_win_roi' in p1_roi.columns:
+                        st.markdown(f"**Grand Slam ROI:** {format_roi(p1_roi['grand_slam_match_win_roi'].iloc[0])}")
 
                     # Show ROI against left-handed opponents if applicable
-                    if p2_left:
-                        st.markdown(f"**vs Left-Handed ROI:** {format_roi(p1_roi['vs_left_handed_match_roi'].iloc[0])}",
-                                unsafe_allow_html=True)
+                    if p2_left and 'vs_left_handed_match_roi' in p1_roi.columns:
+                        st.markdown(f"**vs Left-Handed ROI:** {format_roi(p1_roi['vs_left_handed_match_roi'].iloc[0])}")
 
                     # Show cluster-specific ROIs if available
                     st.markdown("**Cluster ROIs vs Opponent:**")
@@ -468,8 +472,7 @@ def main():
                         if col_name in p1_roi.columns:
                             roi_value = p1_roi[col_name].iloc[0]
                             if not pd.isna(roi_value):
-                                st.markdown(f"- {c_type.capitalize()} Cluster {c_value}: {format_roi(roi_value)}",
-                                            unsafe_allow_html=True)
+                                st.markdown(f"- {c_type.capitalize()} Cluster {c_value}: {format_roi(roi_value)}")
 
                 else:
                     st.warning("No ROI data available for this player")
@@ -488,24 +491,16 @@ def main():
                     col1.metric("Total Matches", total)
                     col2.metric("Win Rate", f"{win_rate:.1f}%")
 
-                    # # Display chart
-                    # fig = plot_player_performance(history, p1_name)
-                    # if fig:
-                    #     st.pyplot(fig)
-
                     # Display match history with color coding
                     history_display = history.copy()
-                    # history_display['Date'] = history_display['match_date'].dt.strftime('%Y-%m-%d')
-                    history_display['Date'] = history_display['match_date']
+                    history_display['Date'] = history_display['match_date'].dt.strftime('%Y-%m-%d')
                     history_display = history_display[['Date', 'tournament_name', 'surface', 'opponent', 'win', 'odds', 'score']]
                     history_display.columns = ['Date', 'Tournament', 'Surface', 'Opponent', 'Win', 'Odds', 'Score']
 
                     # Apply color coding
-                #     st.dataframe(
-                #         history_display.style.apply(format_history_row, axis=1)
-                #     )
-                # else:
-                #     st.info("No match history found for this player")
+                    st.dataframe(history_display.style.apply(format_history_row, axis=1))
+                else:
+                    st.info("No match history found for this player")
 
             # Player 2 analysis
             with col2:
@@ -513,26 +508,19 @@ def main():
 
                 if not p2_roi.empty:
                     # Always show overall ROI
-                    st.markdown(f"**Overall Match ROI:** {format_roi(p2_roi['overall_match_win_roi'].iloc[0])}",
-                                unsafe_allow_html=True)
-
-                    # Show handicap ROIs based on odds
-                    if p2_odds > 2.1:
-                        st.markdown(f"**Plus Handicap ROI:** {format_roi(p2_roi['overall_plus_handicap_roi'].iloc[0])}",
-                                    unsafe_allow_html=True)
-                    elif p2_odds < 1.8:
-                        st.markdown(f"**Minus Handicap ROI:** {format_roi(p2_roi['overall_minus_handicap_roi'].iloc[0])}",
-                                    unsafe_allow_html=True)
+                    st.markdown(f"**Overall Match ROI:** {format_roi(p2_roi['overall_match_win_roi'].iloc[0])}")
 
                     # Show surface-specific ROI
                     surface_roi_col = get_surface_roi_column(surface)
-                    st.markdown(f"**{surface} ROI:** {format_roi(p2_roi[surface_roi_col].iloc[0])}",
-                                unsafe_allow_html=True)
+                    st.markdown(f"**{surface} ROI:** {format_roi(p2_roi[surface_roi_col].iloc[0])}")
+
+                    # Show Grand Slam ROI if applicable
+                    if is_grand_slam and 'grand_slam_match_win_roi' in p2_roi.columns:
+                        st.markdown(f"**Grand Slam ROI:** {format_roi(p2_roi['grand_slam_match_win_roi'].iloc[0])}")
 
                     # Show ROI against left-handed opponents if applicable
-                    if p1_left:
-                        st.markdown(f"**vs Left-Handed ROI:** {format_roi(p2_roi['vs_left_handed_match_roi'].iloc[0])}",
-                                unsafe_allow_html=True)
+                    if p1_left and 'vs_left_handed_match_roi' in p2_roi.columns:
+                        st.markdown(f"**vs Left-Handed ROI:** {format_roi(p2_roi['vs_left_handed_match_roi'].iloc[0])}")
 
                     # Show cluster-specific ROIs if available
                     st.markdown("**Cluster ROIs vs Opponent:**")
@@ -548,8 +536,7 @@ def main():
                         if col_name in p2_roi.columns:
                             roi_value = p2_roi[col_name].iloc[0]
                             if not pd.isna(roi_value):
-                                st.markdown(f"- {c_type.capitalize()} Cluster {c_value}: {format_roi(roi_value)}",
-                                            unsafe_allow_html=True)
+                                st.markdown(f"- {c_type.capitalize()} Cluster {c_value}: {format_roi(roi_value)}")
 
                 else:
                     st.warning("No ROI data available for this player")
@@ -568,24 +555,16 @@ def main():
                     col1.metric("Total Matches", total)
                     col2.metric("Win Rate", f"{win_rate:.1f}%")
 
-                    # # Display chart
-                    # fig = plot_player_performance(history, p2_name)
-                    # if fig:
-                    #     st.pyplot(fig)
-
                     # Display match history with color coding
                     history_display = history.copy()
-                    # history_display['Date'] = history_display['match_date'].dt.strftime('%Y-%m-%d')
-                    history_display['Date'] = history_display['match_date']
+                    history_display['Date'] = history_display['match_date'].dt.strftime('%Y-%m-%d')
                     history_display = history_display[['Date', 'tournament_name', 'surface', 'opponent', 'win', 'odds', 'score']]
                     history_display.columns = ['Date', 'Tournament', 'Surface', 'Opponent', 'Win', 'Odds', 'Score']
 
-                #     # Apply color coding
-                #     st.dataframe(
-                #         history_display.style.apply(format_history_row, axis=1)
-                #     )
-                # else:
-                #     st.info("No match history found for this player")
+                    # Apply color coding
+                    st.dataframe(history_display.style.apply(format_history_row, axis=1))
+                else:
+                    st.info("No match history found for this player")
 
             # Value analysis section
             st.subheader("Value Analysis")
