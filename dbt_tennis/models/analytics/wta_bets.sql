@@ -98,15 +98,16 @@ roi_data as (
     roi_vs_net1_match, roi_vs_net1_plus_handicap, roi_vs_net1_minus_handicap,
     roi_vs_net2_match, roi_vs_net2_plus_handicap, roi_vs_net2_minus_handicap,
     roi_vs_net3_match, roi_vs_net3_plus_handicap, roi_vs_net3_minus_handicap,
+    roi_vs_net4_match, roi_vs_net4_plus_handicap, roi_vs_net4_minus_handicap,
     -- Serve clusters
     roi_vs_serve1_match, roi_vs_serve1_plus_handicap, roi_vs_serve1_minus_handicap,
     roi_vs_serve2_match, roi_vs_serve2_plus_handicap, roi_vs_serve2_minus_handicap,
     roi_vs_serve3_match, roi_vs_serve3_plus_handicap, roi_vs_serve3_minus_handicap,
     roi_vs_serve4_match, roi_vs_serve4_plus_handicap, roi_vs_serve4_minus_handicap,
-
+    roi_vs_serve5_match, roi_vs_serve5_plus_handicap, roi_vs_serve5_minus_handicap,
     -- Special conditions
-    grand_slam_match_win_roi, grand_slam_plus_handicap_roi, grand_slam_minus_handicap_roi,
-    home_match_win_roi, home_plus_handicap_roi, home_minus_handicap_roi
+    grand_slam_match_win_roi,
+    home_match_win_roi,
   from wta_roi as a
   left join wta_players as p on a.player_name = p.player_name
 ),
@@ -191,6 +192,7 @@ roi_enhancements as (
       when 1 then r1.roi_vs_net1_match
       when 2 then r1.roi_vs_net2_match
       when 3 then r1.roi_vs_net3_match
+      when 4 then r1.roi_vs_net4_match
     end as p1_roi_vs_p2_net,
 
     case p2_serve_cluster
@@ -198,6 +200,7 @@ roi_enhancements as (
       when 2 then r1.roi_vs_serve2_match
       when 3 then r1.roi_vs_serve3_match
       when 4 then r1.roi_vs_serve4_match
+      when 5 then r1.roi_vs_serve5_match
     end as p1_roi_vs_p2_serve,
 
      -- NEW: Overall ROIs for Player 1
@@ -217,6 +220,7 @@ roi_enhancements as (
       when 1 then r2.roi_vs_net1_match
       when 2 then r2.roi_vs_net2_match
       when 3 then r2.roi_vs_net3_match
+      when 4 then r2.roi_vs_net4_match
     end as p2_roi_vs_p1_net,
 
     case p1_serve_cluster
@@ -224,6 +228,7 @@ roi_enhancements as (
       when 2 then r2.roi_vs_serve2_match
       when 3 then r2.roi_vs_serve3_match
       when 4 then r2.roi_vs_serve4_match
+      when 5 then r2.roi_vs_serve5_match
     end as p2_roi_vs_p1_serve,
 
 

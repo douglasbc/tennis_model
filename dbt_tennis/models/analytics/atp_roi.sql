@@ -1,407 +1,381 @@
-{{ config(
-    materialized = 'table',
-    schema = 'analytics',
-    partition_by = {
-      "field": "player_name",
-      "data_type": "string"
-    }
-)}}
+{{
+    config(
+        materialized = 'table',
+        schema = 'analytics',
+        partition_by = {
+            "field": "player_name",
+            "data_type": "string"
+        }
+    )
+}}
 
-with 
-
-atp_matches as (
-  select
-    *
-  from {{ ref('atp_matches') }}
-  where
-    regexp_extract(result, r'([a-zA-Z]+)') is null
-    and tournament_tier not in ('Laver Cup', 'Next Gen ATP Finals')
-    and match_date >= '2021-01-01'
-    and p1_win_match_odds is not null and p2_win_match_odds is not null
+with atp_matches as (
+    select *
+    from {{ ref('atp_matches') }}
+    where
+        regexp_extract(result, r'([a-zA-Z]+)') is null
+        and tournament_tier not in ('Laver Cup', 'Next Gen ATP Finals')
+        and match_date >= '2021-01-01'
+        and p1_win_match_odds is not null
+        and p2_win_match_odds is not null
 ),
 
 match_data as (
-  select
-    match_id,
-    tournament_name,
-    surface,
-    tournament_tier,
-    tournament_country,
-    p1_name as player_name,
-    p1_country as player_country,
-    p1_is_left_handed,  -- Added player handedness
-    p1_rally_aggression_cluster as player_rally_cluster,
-    p1_net_points_cluster as player_net_cluster,
-    p1_serve_dependency_cluster as player_serve_cluster,
-    p2_name as opponent_name,
-    p2_country as opponent_country,
-    p2_is_left_handed as opponent_is_left_handed,  -- Added opponent handedness
-    p2_rally_aggression_cluster as opponent_rally_cluster,
-    p2_net_points_cluster as opponent_net_cluster,
-    p2_serve_dependency_cluster as opponent_serve_cluster,
-    1 as is_win,
-    p1_win_match_odds as match_win_odds,
-    p1_handicap_line as handicap_line,
-    p1_handicap_odds as handicap_odds,
-    p1_total_games as games_won,
-    p2_total_games as games_against
-  from atp_matches
+    -- Player 1 perspective
+    select
+        match_id,
+        tournament_name,
+        surface,
+        tournament_tier,
+        tournament_country,
+        p1_name as player_name,
+        p1_country as player_country,
+        p1_is_left_handed,
+        p1_rally_aggression_cluster as player_rally_cluster,
+        p1_net_points_cluster as player_net_cluster,
+        p1_serve_dependency_cluster as player_serve_cluster,
+        p2_name as opponent_name,
+        p2_country as opponent_country,
+        p2_is_left_handed as opponent_is_left_handed,
+        p2_rally_aggression_cluster as opponent_rally_cluster,
+        p2_net_points_cluster as opponent_net_cluster,
+        p2_serve_dependency_cluster as opponent_serve_cluster,
+        1 as is_win,
+        p1_win_match_odds as match_win_odds,
+        p1_handicap_line as handicap_line,
+        p1_handicap_odds as handicap_odds,
+        p1_total_games as games_won,
+        p2_total_games as games_against
+    from atp_matches
 
-  union all
+    union all
 
-  select
-    match_id,
-    tournament_name,
-    surface,
-    tournament_tier,
-    tournament_country,
-    p2_name as player_name,
-    p2_country as player_country,
-    p2_is_left_handed,  -- Added player handedness
-    p2_rally_aggression_cluster as player_rally_cluster,
-    p2_net_points_cluster as player_net_cluster,
-    p2_serve_dependency_cluster as player_serve_cluster,
-    p1_name as opponent_name,
-    p1_country as opponent_country,
-    p1_is_left_handed as opponent_is_left_handed,  -- Added opponent handedness
-    p1_rally_aggression_cluster as opponent_rally_cluster,
-    p1_net_points_cluster as opponent_net_cluster,
-    p1_serve_dependency_cluster as opponent_serve_cluster,
-    0 as is_win,
-    p2_win_match_odds as match_win_odds,
-    p2_handicap_line as handicap_line,
-    p2_handicap_odds as handicap_odds,
-    p2_total_games as games_won,
-    p1_total_games as games_against
-  from atp_matches
+    -- Player 2 perspective
+    select
+        match_id,
+        tournament_name,
+        surface,
+        tournament_tier,
+        tournament_country,
+        p2_name as player_name,
+        p2_country as player_country,
+        p2_is_left_handed,
+        p2_rally_aggression_cluster as player_rally_cluster,
+        p2_net_points_cluster as player_net_cluster,
+        p2_serve_dependency_cluster as player_serve_cluster,
+        p1_name as opponent_name,
+        p1_country as opponent_country,
+        p1_is_left_handed as opponent_is_left_handed,
+        p1_rally_aggression_cluster as opponent_rally_cluster,
+        p1_net_points_cluster as opponent_net_cluster,
+        p1_serve_dependency_cluster as opponent_serve_cluster,
+        0 as is_win,
+        p2_win_match_odds as match_win_odds,
+        p2_handicap_line as handicap_line,
+        p2_handicap_odds as handicap_odds,
+        p2_total_games as games_won,
+        p1_total_games as games_against
+    from atp_matches
 ),
 
 bet_calculations as (
-  select
-    *,
-    -- match win roi calculation
-    (is_win * match_win_odds) - 1 as match_win_profit,
+    select
+        *,
+        -- Match win ROI calculation
+        (is_win * match_win_odds) - 1 as match_win_profit,
 
-    -- plus handicap calculation (receiving extra games)
-    case when handicap_line > 0 then
-      case
-        when (games_won + handicap_line) = games_against then 0
-        when (games_won + handicap_line) > games_against then handicap_odds -1
-        else -1 end
-      end as plus_handicap_profit,
+        -- PLUS handicap calculation (receiving extra games)
+        case
+            when handicap_line > 0 and handicap_odds is not null then
+                case
+                    when (games_won + handicap_line) > games_against then handicap_odds - 1
+                    when (games_won + handicap_line) = games_against then 0
+                    else -1
+                end
+            else null  -- Explicit null when not a valid plus handicap
+        end as plus_handicap_profit,
 
-    -- minus handicap calculation (giving away games)
-    case when handicap_line < 0 then
-      case
-        when (games_won + handicap_line) = games_against then 0
-        when (games_won + handicap_line) > games_against then handicap_odds -1
-        else -1 end
-      end as minus_handicap_profit,
+        -- MINUS handicap calculation (giving away games)
+        case
+            when handicap_line < 0 and handicap_odds is not null then
+                case
+                    when (games_won + handicap_line) > games_against then handicap_odds - 1
+                    when (games_won + handicap_line) = games_against then 0
+                    else -1
+                end
+            else null  -- Explicit null when not a valid minus handicap
+        end as minus_handicap_profit,
 
-     -- flags for special conditions
-    case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
-    case when player_country = tournament_country then 1 else 0 end as is_home_country
-  from (select * from match_data where match_win_odds is not null)
+        -- Flags for special conditions
+        case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
+        case when player_country = tournament_country then 1 else 0 end as is_home_country
+    from match_data
 ),
 
--- CORRECTED overall_roi CTE
-overall_roi AS (
-  SELECT
-    player_name,
-    -- Match win metrics
-    COUNT(*) AS overall_total_matches,
-    SUM(match_win_profit) AS overall_total_match_win_profit,
-
-    -- Plus handicap metrics - ONLY COUNT MATCHES WITH VALID ODDS
-    COUNTIF(handicap_line > 0 AND handicap_odds IS NOT NULL) AS overall_plus_handicap_matches,
-    SUM(IF(handicap_line > 0 AND handicap_odds IS NOT NULL, plus_handicap_profit, 0)) AS overall_total_plus_handicap_profit,
-
-    -- Minus handicap metrics - ONLY COUNT MATCHES WITH VALID ODDS
-    COUNTIF(handicap_line < 0 AND handicap_odds IS NOT NULL) AS overall_minus_handicap_matches,
-    SUM(IF(handicap_line < 0 AND handicap_odds IS NOT NULL, minus_handicap_profit, 0)) AS overall_total_minus_handicap_profit,
-
-    -- NEW: Against left-handed opponents
-    COUNTIF(opponent_is_left_handed) AS vs_left_handed_matches,
-    SUM(IF(opponent_is_left_handed, match_win_profit, 0)) AS vs_left_handed_match_win_profit,
-    COUNTIF(opponent_is_left_handed AND handicap_line > 0 AND handicap_odds IS NOT NULL) AS vs_left_handed_plus_handicap_matches,
-    SUM(IF(opponent_is_left_handed AND handicap_line > 0 AND handicap_odds IS NOT NULL, plus_handicap_profit, 0)) AS vs_left_handed_plus_handicap_profit,
-    COUNTIF(opponent_is_left_handed AND handicap_line < 0 AND handicap_odds IS NOT NULL) AS vs_left_handed_minus_handicap_matches,
-    SUM(IF(opponent_is_left_handed AND handicap_line < 0 AND handicap_odds IS NOT NULL, minus_handicap_profit, 0)) AS vs_left_handed_minus_handicap_profit,
-
-    -- Surface-specific metrics
-    COUNTIF(surface = 'Clay') AS clay_matches,
-    SUM(IF(surface = 'Clay', match_win_profit, 0)) AS clay_match_win_profit,
-    COUNTIF(surface = 'Clay' AND handicap_line > 0 AND handicap_odds IS NOT NULL) AS clay_plus_handicap_matches,
-    SUM(IF(surface = 'Clay' AND handicap_line > 0 AND handicap_odds IS NOT NULL, plus_handicap_profit, 0)) AS clay_plus_handicap_profit,
-    COUNTIF(surface = 'Clay' AND handicap_line < 0 AND handicap_odds IS NOT NULL) AS clay_minus_handicap_matches,
-    SUM(IF(surface = 'Clay' AND handicap_line < 0 AND handicap_odds IS NOT NULL, minus_handicap_profit, 0)) AS clay_minus_handicap_profit,
-
-    COUNTIF(surface = 'Grass') AS grass_matches,
-    SUM(IF(surface = 'Grass', match_win_profit, 0)) AS grass_match_win_profit,
-    COUNTIF(surface = 'Grass' AND handicap_line > 0 AND handicap_odds IS NOT NULL) AS grass_plus_handicap_matches,
-    SUM(IF(surface = 'Grass' AND handicap_line > 0 AND handicap_odds IS NOT NULL, plus_handicap_profit, 0)) AS grass_plus_handicap_profit,
-    COUNTIF(surface = 'Grass' AND handicap_line < 0 AND handicap_odds IS NOT NULL) AS grass_minus_handicap_matches,
-    SUM(IF(surface = 'Grass' AND handicap_line < 0 AND handicap_odds IS NOT NULL, minus_handicap_profit, 0)) AS grass_minus_handicap_profit,
-
-    COUNTIF(surface = 'Hard') AS hard_matches,
-    SUM(IF(surface = 'Hard', match_win_profit, 0)) AS hard_match_win_profit,
-    COUNTIF(surface = 'Hard' AND handicap_line > 0 AND handicap_odds IS NOT NULL) AS hard_plus_handicap_matches,
-    SUM(IF(surface = 'Hard' AND handicap_line > 0 AND handicap_odds IS NOT NULL, plus_handicap_profit, 0)) AS hard_plus_handicap_profit,
-    COUNTIF(surface = 'Hard' AND handicap_line < 0 AND handicap_odds IS NOT NULL) AS hard_minus_handicap_matches,
-    SUM(IF(surface = 'Hard' AND handicap_line < 0 AND handicap_odds IS NOT NULL, minus_handicap_profit, 0)) AS hard_minus_handicap_profit,
-
-    COUNTIF(surface = 'Indoor Hard') AS indoor_hard_matches,
-    SUM(IF(surface = 'Indoor Hard', match_win_profit, 0)) AS indoor_hard_match_win_profit,
-    COUNTIF(surface = 'Indoor Hard' AND handicap_line > 0 AND handicap_odds IS NOT NULL) AS indoor_hard_plus_handicap_matches,
-    SUM(IF(surface = 'Indoor Hard' AND handicap_line > 0 AND handicap_odds IS NOT NULL, plus_handicap_profit, 0)) AS indoor_hard_plus_handicap_profit,
-    COUNTIF(surface = 'Indoor Hard' AND handicap_line < 0 AND handicap_odds IS NOT NULL) AS indoor_hard_minus_handicap_matches,
-    SUM(IF(surface = 'Indoor Hard' AND handicap_line < 0 AND handicap_odds IS NOT NULL, minus_handicap_profit, 0)) AS indoor_hard_minus_handicap_profit,
-
-    -- Grand Slam metrics
-    SUM(is_grand_slam) AS grand_slam_matches,
-    SUM(match_win_profit * is_grand_slam) AS grand_slam_match_win_profit,
-    SUM(plus_handicap_profit * is_grand_slam) AS grand_slam_plus_handicap_profit,
-    SUM(minus_handicap_profit * is_grand_slam) AS grand_slam_minus_handicap_profit,
-
-    -- Home country metrics
-    SUM(is_home_country) AS home_matches,
-    SUM(match_win_profit * is_home_country) AS home_match_win_profit,
-    SUM(plus_handicap_profit * is_home_country) AS home_plus_handicap_profit,
-    SUM(minus_handicap_profit * is_home_country) AS home_minus_handicap_profit
-  FROM bet_calculations
-  GROUP BY player_name
+-- SEPARATE CTEs FOR DIFFERENT BET TYPES
+match_win_bets as (
+    select
+        player_name,
+        opponent_is_left_handed,
+        surface,
+        is_grand_slam,
+        is_home_country,
+        opponent_rally_cluster,
+        opponent_net_cluster,
+        opponent_serve_cluster,
+        match_win_profit as profit
+    from bet_calculations
+    where match_win_odds is not null
 ),
 
--- Cluster-specific ROI calculations remain grouped
-roi_aggregations as (
-  SELECT
-    player_name,
-    opponent_rally_cluster,
-    opponent_net_cluster,
-    opponent_serve_cluster,
-
-    -- Match win metrics
-    COUNT(*) AS total_matches,
-    SUM(match_win_profit) AS total_match_win_profit,
-
-    -- Plus handicap metrics
-    COUNTIF(handicap_line > 0 AND handicap_odds IS NOT NULL) AS plus_handicap_matches,
-    SUM(plus_handicap_profit) AS total_plus_handicap_profit,
-
-    -- Minus handicap metrics
-    COUNTIF(handicap_line < 0 AND handicap_odds IS NOT NULL) AS minus_handicap_matches,
-    SUM(minus_handicap_profit) AS total_minus_handicap_profit
-  FROM bet_calculations
-  GROUP BY player_name, opponent_rally_cluster, opponent_net_cluster, opponent_serve_cluster
+plus_handicap_bets as (
+    select
+        player_name,
+        opponent_is_left_handed,
+        surface,
+        is_grand_slam,
+        is_home_country,
+        opponent_rally_cluster,
+        opponent_net_cluster,
+        opponent_serve_cluster,
+        plus_handicap_profit as profit
+    from bet_calculations
+    where handicap_line > 0 and handicap_odds is not null
 ),
 
-pivoted_roi AS (
-  SELECT
-    r.player_name,
+minus_handicap_bets as (
+    select
+        player_name,
+        opponent_is_left_handed,
+        surface,
+        is_grand_slam,
+        is_home_country,
+        opponent_rally_cluster,
+        opponent_net_cluster,
+        opponent_serve_cluster,
+        minus_handicap_profit as profit
+    from bet_calculations
+    where handicap_line < 0 and handicap_odds is not null
+),
 
-    -- Overall ROIs
-    o.overall_total_match_win_profit / NULLIF(o.overall_total_matches, 0) * 100 AS overall_match_win_roi,
-    o.overall_total_plus_handicap_profit / NULLIF(o.overall_plus_handicap_matches, 0) * 100 AS overall_plus_handicap_roi,
-    o.overall_total_minus_handicap_profit / NULLIF(o.overall_minus_handicap_matches, 0) * 100 AS overall_minus_handicap_roi,
+-- ROI CALCULATION FOR OVERALL, SURFACE, AND SPECIAL CONDITIONS
+roi_calculator as (
+    select
+        player_name,
+        bet_type,
 
-    -- NEW: Against left-handed opponents
-    o.vs_left_handed_match_win_profit / NULLIF(o.vs_left_handed_matches, 0) * 100 AS vs_left_handed_match_roi,
-    o.vs_left_handed_plus_handicap_profit / NULLIF(o.vs_left_handed_plus_handicap_matches, 0) * 100 AS vs_left_handed_plus_handicap_roi,
-    o.vs_left_handed_minus_handicap_profit / NULLIF(o.vs_left_handed_minus_handicap_matches, 0) * 100 AS vs_left_handed_minus_handicap_roi,
+        -- Overall metrics
+        count(*) as total_matches,
+        sum(profit) as total_profit,
 
-    -- Surface ROIs
-    -- Clay
-    o.clay_match_win_profit / NULLIF(o.clay_matches, 0) * 100 AS clay_match_win_roi,
-    o.clay_plus_handicap_profit / NULLIF(o.clay_plus_handicap_matches, 0) * 100 AS clay_plus_handicap_roi,
-    o.clay_minus_handicap_profit / NULLIF(o.clay_minus_handicap_matches, 0) * 100 AS clay_minus_handicap_roi,
+        -- Surface metrics
+        countif(surface = 'Clay') as clay_matches,
+        sum(if(surface = 'Clay', profit, 0)) as clay_profit,
 
-    -- Grass
-    o.grass_match_win_profit / NULLIF(o.grass_matches, 0) * 100 AS grass_match_win_roi,
-    o.grass_plus_handicap_profit / NULLIF(o.grass_plus_handicap_matches, 0) * 100 AS grass_plus_handicap_roi,
-    o.grass_minus_handicap_profit / NULLIF(o.grass_minus_handicap_matches, 0) * 100 AS grass_minus_handicap_roi,
+        countif(surface = 'Grass') as grass_matches,
+        sum(if(surface = 'Grass', profit, 0)) as grass_profit,
 
-    -- Hard
-    o.hard_match_win_profit / NULLIF(o.hard_matches, 0) * 100 AS hard_match_win_roi,
-    o.hard_plus_handicap_profit / NULLIF(o.hard_plus_handicap_matches, 0) * 100 AS hard_plus_handicap_roi,
-    o.hard_minus_handicap_profit / NULLIF(o.hard_minus_handicap_matches, 0) * 100 AS hard_minus_handicap_roi,
+        countif(surface = 'Hard') as hard_matches,
+        sum(if(surface = 'Hard', profit, 0)) as hard_profit,
 
-    -- Indoor Hard
-    o.indoor_hard_match_win_profit / NULLIF(o.indoor_hard_matches, 0) * 100 AS indoor_hard_match_win_roi,
-    o.indoor_hard_plus_handicap_profit / NULLIF(o.indoor_hard_plus_handicap_matches, 0) * 100 AS indoor_hard_plus_handicap_roi,
-    o.indoor_hard_minus_handicap_profit / NULLIF(o.indoor_hard_minus_handicap_matches, 0) * 100 AS indoor_hard_minus_handicap_roi,
+        countif(surface = 'Indoor Hard') as indoor_hard_matches,
+        sum(if(surface = 'Indoor Hard', profit, 0)) as indoor_hard_profit,
 
-    -- Grand Slam ROIs from separate CTE
-    o.grand_slam_match_win_profit / NULLIF(o.grand_slam_matches, 0) * 100 AS grand_slam_match_win_roi,
-    o.grand_slam_plus_handicap_profit / NULLIF(o.grand_slam_matches, 0) * 100 AS grand_slam_plus_handicap_roi,
-    o.grand_slam_minus_handicap_profit / NULLIF(o.grand_slam_matches, 0) * 100 AS grand_slam_minus_handicap_roi,
+        -- Left-handed opponents
+        countif(opponent_is_left_handed) as vs_left_handed_matches,
+        sum(if(opponent_is_left_handed, profit, 0)) as vs_left_handed_profit,
 
-    -- Home Country ROIs from separate CTE
-    o.home_match_win_profit / NULLIF(o.home_matches, 0) * 100 AS home_match_win_roi,
-    o.home_plus_handicap_profit / NULLIF(o.home_matches, 0) * 100 AS home_plus_handicap_roi,
-    o.home_minus_handicap_profit / NULLIF(o.home_matches, 0) * 100 AS home_minus_handicap_roi,
+        -- Grand Slams
+        countif(is_grand_slam = 1) as grand_slam_matches,
+        sum(if(is_grand_slam = 1, profit, 0)) as grand_slam_profit,
 
-    -- Rally Aggression Clusters (1-4)
-    -- Cluster 1
-    SUM(IF(opponent_rally_cluster = 1, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 1, total_matches, 0)), 0) * 100 AS roi_vs_rally1_match,
-    SUM(IF(opponent_rally_cluster = 1, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 1, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally1_plus_handicap,
-    SUM(IF(opponent_rally_cluster = 1, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 1, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally1_minus_handicap,
-    SUM(IF(opponent_rally_cluster = 1, total_matches, 0)) AS matches_vs_rally1,
-    SUM(IF(opponent_rally_cluster = 1, plus_handicap_matches, 0)) AS plus_handicap_vs_rally1,
-    SUM(IF(opponent_rally_cluster = 1, minus_handicap_matches, 0)) AS minus_handicap_vs_rally1,
+        -- Home country
+        countif(is_home_country = 1) as home_matches,
+        sum(if(is_home_country = 1, profit, 0)) as home_profit
+    from (
+        select *, 'match_win' as bet_type from match_win_bets
+        union all
+        select *, 'plus_handicap' as bet_type from plus_handicap_bets
+        union all
+        select *, 'minus_handicap' as bet_type from minus_handicap_bets
+    )
+    group by player_name, bet_type
+),
 
-    -- Cluster 2
-    SUM(IF(opponent_rally_cluster = 2, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 2, total_matches, 0)), 0) * 100 AS roi_vs_rally2_match,
-    SUM(IF(opponent_rally_cluster = 2, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 2, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally2_plus_handicap,
-    SUM(IF(opponent_rally_cluster = 2, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 2, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally2_minus_handicap,
-    SUM(IF(opponent_rally_cluster = 2, total_matches, 0)) AS matches_vs_rally2,
-    SUM(IF(opponent_rally_cluster = 2, plus_handicap_matches, 0)) AS plus_handicap_vs_rally2,
-    SUM(IF(opponent_rally_cluster = 2, minus_handicap_matches, 0)) AS minus_handicap_vs_rally2,
+-- CLUSTER-SPECIFIC ROI CALCULATIONS
+cluster_roi_calculator as (
+    select
+        player_name,
+        bet_type,
+        opponent_rally_cluster,
+        opponent_net_cluster,
+        opponent_serve_cluster,
+        count(*) as total_matches,
+        sum(profit) as total_profit
+    from (
+        select
+            player_name,
+            opponent_rally_cluster,
+            opponent_net_cluster,
+            opponent_serve_cluster,
+            profit,
+            'match_win' as bet_type
+        from match_win_bets
 
-    -- Cluster 3
-    SUM(IF(opponent_rally_cluster = 3, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 3, total_matches, 0)), 0) * 100 AS roi_vs_rally3_match,
-    SUM(IF(opponent_rally_cluster = 3, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 3, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally3_plus_handicap,
-    SUM(IF(opponent_rally_cluster = 3, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 3, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally3_minus_handicap,
-    SUM(IF(opponent_rally_cluster = 3, total_matches, 0)) AS matches_vs_rally3,
-    SUM(IF(opponent_rally_cluster = 3, plus_handicap_matches, 0)) AS plus_handicap_vs_rally3,
-    SUM(IF(opponent_rally_cluster = 3, minus_handicap_matches, 0)) AS minus_handicap_vs_rally3,
+        union all
 
-    -- Cluster 4
-    SUM(IF(opponent_rally_cluster = 4, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 4, total_matches, 0)), 0) * 100 AS roi_vs_rally4_match,
-    SUM(IF(opponent_rally_cluster = 4, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 4, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally4_plus_handicap,
-    SUM(IF(opponent_rally_cluster = 4, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_rally_cluster = 4, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_rally4_minus_handicap,
-    SUM(IF(opponent_rally_cluster = 4, total_matches, 0)) AS matches_vs_rally4,
-    SUM(IF(opponent_rally_cluster = 4, plus_handicap_matches, 0)) AS plus_handicap_vs_rally4,
-    SUM(IF(opponent_rally_cluster = 4, minus_handicap_matches, 0)) AS minus_handicap_vs_rally4,
+        select
+            player_name,
+            opponent_rally_cluster,
+            opponent_net_cluster,
+            opponent_serve_cluster,
+            profit,
+            'plus_handicap' as bet_type
+        from plus_handicap_bets
 
-    -- Net Points Clusters (1-4)
-    -- Cluster 1
-    SUM(IF(opponent_net_cluster = 1, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 1, total_matches, 0)), 0) * 100 AS roi_vs_net1_match,
-    SUM(IF(opponent_net_cluster = 1, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 1, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_net1_plus_handicap,
-    SUM(IF(opponent_net_cluster = 1, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 1, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_net1_minus_handicap,
-    SUM(IF(opponent_net_cluster = 1, total_matches, 0)) AS matches_vs_net1,
-    SUM(IF(opponent_net_cluster = 1, plus_handicap_matches, 0)) AS plus_handicap_vs_net1,
-    SUM(IF(opponent_net_cluster = 1, minus_handicap_matches, 0)) AS minus_handicap_vs_net1,
+        union all
 
-    -- Cluster 2
-    SUM(IF(opponent_net_cluster = 2, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 2, total_matches, 0)), 0) * 100 AS roi_vs_net2_match,
-    SUM(IF(opponent_net_cluster = 2, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 2, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_net2_plus_handicap,
-    SUM(IF(opponent_net_cluster = 2, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 2, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_net2_minus_handicap,
-    SUM(IF(opponent_net_cluster = 2, total_matches, 0)) AS matches_vs_net2,
-    SUM(IF(opponent_net_cluster = 2, plus_handicap_matches, 0)) AS plus_handicap_vs_net2,
-    SUM(IF(opponent_net_cluster = 2, minus_handicap_matches, 0)) AS minus_handicap_vs_net2,
+        select
+            player_name,
+            opponent_rally_cluster,
+            opponent_net_cluster,
+            opponent_serve_cluster,
+            profit,
+            'minus_handicap' as bet_type
+        from minus_handicap_bets
+    )
+    group by player_name, bet_type, opponent_rally_cluster, opponent_net_cluster, opponent_serve_cluster
+),
 
-    -- Cluster 3
-    SUM(IF(opponent_net_cluster = 3, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 3, total_matches, 0)), 0) * 100 AS roi_vs_net3_match,
-    SUM(IF(opponent_net_cluster = 3, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 3, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_net3_plus_handicap,
-    SUM(IF(opponent_net_cluster = 3, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 3, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_net3_minus_handicap,
-    SUM(IF(opponent_net_cluster = 3, total_matches, 0)) AS matches_vs_net3,
-    SUM(IF(opponent_net_cluster = 3, plus_handicap_matches, 0)) AS plus_handicap_vs_net3,
-    SUM(IF(opponent_net_cluster = 3, minus_handicap_matches, 0)) AS minus_handicap_vs_net3,
+-- PIVOTED ROI FOR OVERALL, SURFACE, AND SPECIAL CONDITIONS
+pivoted_roi as (
+    select
+        player_name,
 
-    -- Cluster 4
-    SUM(IF(opponent_net_cluster = 4, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 4, total_matches, 0)), 0) * 100 AS roi_vs_net4_match,
-    SUM(IF(opponent_net_cluster = 4, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 4, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_net4_plus_handicap,
-    SUM(IF(opponent_net_cluster = 4, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_net_cluster = 4, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_net4_minus_handicap,
-    SUM(IF(opponent_net_cluster = 4, total_matches, 0)) AS matches_vs_net4,
-    SUM(IF(opponent_net_cluster = 4, plus_handicap_matches, 0)) AS plus_handicap_vs_net4,
-    SUM(IF(opponent_net_cluster = 4, minus_handicap_matches, 0)) AS minus_handicap_vs_net4,
+        -- Match Win ROIs
+        max(if(bet_type = 'match_win', total_profit / nullif(total_matches, 0) * 100, null)) as overall_match_win_roi,
+        max(if(bet_type = 'match_win', vs_left_handed_profit / nullif(vs_left_handed_matches, 0) * 100, null)) as vs_left_handed_match_roi,
+        max(if(bet_type = 'match_win', clay_profit / nullif(clay_matches, 0) * 100, null)) as clay_match_win_roi,
+        max(if(bet_type = 'match_win', grass_profit / nullif(grass_matches, 0) * 100, null)) as grass_match_win_roi,
+        max(if(bet_type = 'match_win', hard_profit / nullif(hard_matches, 0) * 100, null)) as hard_match_win_roi,
+        max(if(bet_type = 'match_win', indoor_hard_profit / nullif(indoor_hard_matches, 0) * 100, null)) as indoor_hard_match_win_roi,
+        max(if(bet_type = 'match_win', grand_slam_profit / nullif(grand_slam_matches, 0) * 100, null)) as grand_slam_match_win_roi,
+        max(if(bet_type = 'match_win', home_profit / nullif(home_matches, 0) * 100, null)) as home_match_win_roi,
 
-    -- Serve Dependency Clusters (1-5)
-    -- Cluster 1
-    SUM(IF(opponent_serve_cluster = 1, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 1, total_matches, 0)), 0) * 100 AS roi_vs_serve1_match,
-    SUM(IF(opponent_serve_cluster = 1, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 1, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve1_plus_handicap,
-    SUM(IF(opponent_serve_cluster = 1, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 1, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve1_minus_handicap,
-    SUM(IF(opponent_serve_cluster = 1, total_matches, 0)) AS matches_vs_serve1,
-    SUM(IF(opponent_serve_cluster = 1, plus_handicap_matches, 0)) AS plus_handicap_vs_serve1,
-    SUM(IF(opponent_serve_cluster = 1, minus_handicap_matches, 0)) AS minus_handicap_vs_serve1,
+        -- Plus Handicap ROIs
+        max(if(bet_type = 'plus_handicap', total_profit / nullif(total_matches, 0) * 100, null)) as overall_plus_handicap_roi,
+        max(if(bet_type = 'plus_handicap', vs_left_handed_profit / nullif(vs_left_handed_matches, 0) * 100, null)) as vs_left_handed_plus_handicap_roi,
+        max(if(bet_type = 'plus_handicap', clay_profit / nullif(clay_matches, 0) * 100, null)) as clay_plus_handicap_roi,
+        max(if(bet_type = 'plus_handicap', grass_profit / nullif(grass_matches, 0) * 100, null)) as grass_plus_handicap_roi,
+        max(if(bet_type = 'plus_handicap', hard_profit / nullif(hard_matches, 0) * 100, null)) as hard_plus_handicap_roi,
+        max(if(bet_type = 'plus_handicap', indoor_hard_profit / nullif(indoor_hard_matches, 0) * 100, null)) as indoor_hard_plus_handicap_roi,
 
-    -- Cluster 2
-    SUM(IF(opponent_serve_cluster = 2, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 2, total_matches, 0)), 0) * 100 AS roi_vs_serve2_match,
-    SUM(IF(opponent_serve_cluster = 2, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 2, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve2_plus_handicap,
-    SUM(IF(opponent_serve_cluster = 2, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 2, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve2_minus_handicap,
-    SUM(IF(opponent_serve_cluster = 2, total_matches, 0)) AS matches_vs_serve2,
-    SUM(IF(opponent_serve_cluster = 2, plus_handicap_matches, 0)) AS plus_handicap_vs_serve2,
-    SUM(IF(opponent_serve_cluster = 2, minus_handicap_matches, 0)) AS minus_handicap_vs_serve2,
+        -- Minus Handicap ROIs
+        max(if(bet_type = 'minus_handicap', total_profit / nullif(total_matches, 0) * 100, null)) as overall_minus_handicap_roi,
+        max(if(bet_type = 'minus_handicap', vs_left_handed_profit / nullif(vs_left_handed_matches, 0) * 100, null)) as vs_left_handed_minus_handicap_roi,
+        max(if(bet_type = 'minus_handicap', clay_profit / nullif(clay_matches, 0) * 100, null)) as clay_minus_handicap_roi,
+        max(if(bet_type = 'minus_handicap', grass_profit / nullif(grass_matches, 0) * 100, null)) as grass_minus_handicap_roi,
+        max(if(bet_type = 'minus_handicap', hard_profit / nullif(hard_matches, 0) * 100, null)) as hard_minus_handicap_roi,
+        max(if(bet_type = 'minus_handicap', indoor_hard_profit / nullif(indoor_hard_matches, 0) * 100, null)) as indoor_hard_minus_handicap_roi
+    from roi_calculator
+    group by player_name
+),
 
-    -- Cluster 3
-    SUM(IF(opponent_serve_cluster = 3, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 3, total_matches, 0)), 0) * 100 AS roi_vs_serve3_match,
-    SUM(IF(opponent_serve_cluster = 3, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 3, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve3_plus_handicap,
-    SUM(IF(opponent_serve_cluster = 3, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 3, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve3_minus_handicap,
-    SUM(IF(opponent_serve_cluster = 3, total_matches, 0)) AS matches_vs_serve3,
-    SUM(IF(opponent_serve_cluster = 3, plus_handicap_matches, 0)) AS plus_handicap_vs_serve3,
-    SUM(IF(opponent_serve_cluster = 3, minus_handicap_matches, 0)) AS minus_handicap_vs_serve3,
+-- PIVOTED CLUSTER-SPECIFIC ROIS
+cluster_pivot as (
+    select
+        player_name,
+        -- Rally Aggression Clusters (1-4)
+        -- Cluster 1
+        sum(if(opponent_rally_cluster = 1 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 1 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_rally1_match,
+        sum(if(opponent_rally_cluster = 1 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 1 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally1_plus_handicap,
+        sum(if(opponent_rally_cluster = 1 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 1 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally1_minus_handicap,
 
-    -- Cluster 4
-    SUM(IF(opponent_serve_cluster = 4, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 4, total_matches, 0)), 0) * 100 AS roi_vs_serve4_match,
-    SUM(IF(opponent_serve_cluster = 4, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 4, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve4_plus_handicap,
-    SUM(IF(opponent_serve_cluster = 4, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 4, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve4_minus_handicap,
-    SUM(IF(opponent_serve_cluster = 4, total_matches, 0)) AS matches_vs_serve4,
-    SUM(IF(opponent_serve_cluster = 4, plus_handicap_matches, 0)) AS plus_handicap_vs_serve4,
-    SUM(IF(opponent_serve_cluster = 4, minus_handicap_matches, 0)) AS minus_handicap_vs_serve4,
+        -- Cluster 2
+        sum(if(opponent_rally_cluster = 2 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 2 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_rally2_match,
+        sum(if(opponent_rally_cluster = 2 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 2 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally2_plus_handicap,
+        sum(if(opponent_rally_cluster = 2 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 2 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally2_minus_handicap,
 
-    -- Cluster 5
-    SUM(IF(opponent_serve_cluster = 5, total_match_win_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 5, total_matches, 0)), 0) * 100 AS roi_vs_serve5_match,
-    SUM(IF(opponent_serve_cluster = 5, total_plus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 5, plus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve5_plus_handicap,
-    SUM(IF(opponent_serve_cluster = 5, total_minus_handicap_profit, 0)) / NULLIF(SUM(IF(opponent_serve_cluster = 5, minus_handicap_matches, 0)), 0) * 100 AS roi_vs_serve5_minus_handicap,
-    SUM(IF(opponent_serve_cluster = 5, total_matches, 0)) AS matches_vs_serve5,
-    SUM(IF(opponent_serve_cluster = 5, plus_handicap_matches, 0)) AS plus_handicap_vs_serve5,
-    SUM(IF(opponent_serve_cluster = 5, minus_handicap_matches, 0)) AS minus_handicap_vs_serve5
+        -- Cluster 3
+        sum(if(opponent_rally_cluster = 3 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 3 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_rally3_match,
+        sum(if(opponent_rally_cluster = 3 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 3 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally3_plus_handicap,
+        sum(if(opponent_rally_cluster = 3 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 3 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally3_minus_handicap,
 
-FROM roi_aggregations r
-  JOIN overall_roi o ON r.player_name = o.player_name
-  GROUP BY
-    r.player_name,
-    o.overall_total_match_win_profit,
-    o.overall_total_matches,
-    o.overall_total_plus_handicap_profit,
-    o.overall_plus_handicap_matches,
-    o.overall_total_minus_handicap_profit,
-    o.overall_minus_handicap_matches,
-    -- Include all new aggregation columns in GROUP BY
-    o.vs_left_handed_match_win_profit,
-    o.vs_left_handed_matches,
-    o.vs_left_handed_plus_handicap_profit,
-    o.vs_left_handed_plus_handicap_matches,
-    o.vs_left_handed_minus_handicap_profit,
-    o.vs_left_handed_minus_handicap_matches,
-    o.clay_match_win_profit,
-    o.clay_matches,
-    o.clay_plus_handicap_profit,
-    o.clay_plus_handicap_matches,
-    o.clay_minus_handicap_profit,
-    o.clay_minus_handicap_matches,
+        -- Cluster 4
+        sum(if(opponent_rally_cluster = 4 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 4 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_rally4_match,
+        sum(if(opponent_rally_cluster = 4 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 4 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally4_plus_handicap,
+        sum(if(opponent_rally_cluster = 4 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_rally_cluster = 4 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_rally4_minus_handicap,
 
-    o.grass_match_win_profit,
-    o.grass_matches,
-    o.grass_plus_handicap_profit,
-    o.grass_plus_handicap_matches,
-    o.grass_minus_handicap_profit,
-    o.grass_minus_handicap_matches,
+        -- Net Points Clusters (1-4)
+        -- Cluster 1
+        sum(if(opponent_net_cluster = 1 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 1 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_net1_match,
+        sum(if(opponent_net_cluster = 1 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 1 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net1_plus_handicap,
+        sum(if(opponent_net_cluster = 1 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 1 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net1_minus_handicap,
 
-    o.hard_match_win_profit,
-    o.hard_matches,
-    o.hard_plus_handicap_profit,
-    o.hard_plus_handicap_matches,
-    o.hard_minus_handicap_profit,
-    o.hard_minus_handicap_matches,
+        -- Cluster 2
+        sum(if(opponent_net_cluster = 2 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 2 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_net2_match,
+        sum(if(opponent_net_cluster = 2 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 2 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net2_plus_handicap,
+        sum(if(opponent_net_cluster = 2 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 2 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net2_minus_handicap,
 
-    o.indoor_hard_match_win_profit,
-    o.indoor_hard_matches,
-    o.indoor_hard_plus_handicap_profit,
-    o.indoor_hard_plus_handicap_matches,
-    o.indoor_hard_minus_handicap_profit,
-    o.indoor_hard_minus_handicap_matches,
+        -- Cluster 3
+        sum(if(opponent_net_cluster = 3 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 3 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_net3_match,
+        sum(if(opponent_net_cluster = 3 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 3 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net3_plus_handicap,
+        sum(if(opponent_net_cluster = 3 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 3 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net3_minus_handicap,
 
-    o.grand_slam_match_win_profit,
-    o.grand_slam_matches,
-    o.grand_slam_plus_handicap_profit,
-    o.grand_slam_minus_handicap_profit,
-    o.home_match_win_profit,
-    o.home_matches,
-    o.home_plus_handicap_profit,
-    o.home_minus_handicap_profit
+        -- Cluster 4
+        sum(if(opponent_net_cluster = 4 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 4 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_net4_match,
+        sum(if(opponent_net_cluster = 4 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 4 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net4_plus_handicap,
+        sum(if(opponent_net_cluster = 4 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 4 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net4_minus_handicap,
+
+        -- Serve Dependency Clusters (1-5)
+        -- Cluster 1
+        sum(if(opponent_serve_cluster = 1 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 1 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve1_match,
+        sum(if(opponent_serve_cluster = 1 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 1 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve1_plus_handicap,
+        sum(if(opponent_serve_cluster = 1 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 1 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve1_minus_handicap,
+
+        -- Cluster 2
+        sum(if(opponent_serve_cluster = 2 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 2 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve2_match,
+        sum(if(opponent_serve_cluster = 2 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 2 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve2_plus_handicap,
+        sum(if(opponent_serve_cluster = 2 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 2 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve2_minus_handicap,
+
+        -- Cluster 3
+        sum(if(opponent_serve_cluster = 3 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 3 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve3_match,
+        sum(if(opponent_serve_cluster = 3 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 3 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve3_plus_handicap,
+        sum(if(opponent_serve_cluster = 3 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 3 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve3_minus_handicap,
+
+        -- Cluster 4
+        sum(if(opponent_serve_cluster = 4 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 4 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve4_match,
+        sum(if(opponent_serve_cluster = 4 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 4 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve4_plus_handicap,
+        sum(if(opponent_serve_cluster = 4 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 4 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve4_minus_handicap,
+
+        -- Cluster 5
+        sum(if(opponent_serve_cluster = 5 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 5 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve5_match,
+        sum(if(opponent_serve_cluster = 5 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 5 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve5_plus_handicap,
+        sum(if(opponent_serve_cluster = 5 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 5 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve5_minus_handicap
+    from cluster_roi_calculator
+    group by player_name
+),
+
+-- FINAL COMBINED RESULTS
+final_roi as (
+    select
+        p.*,
+        c.roi_vs_rally1_match, c.roi_vs_rally1_plus_handicap, c.roi_vs_rally1_minus_handicap,
+        c.roi_vs_rally2_match, c.roi_vs_rally2_plus_handicap, c.roi_vs_rally2_minus_handicap,
+        c.roi_vs_rally3_match, c.roi_vs_rally3_plus_handicap, c.roi_vs_rally3_minus_handicap,
+        c.roi_vs_rally4_match, c.roi_vs_rally4_plus_handicap, c.roi_vs_rally4_minus_handicap,
+        c.roi_vs_net1_match, c.roi_vs_net1_plus_handicap, c.roi_vs_net1_minus_handicap,
+        c.roi_vs_net2_match, c.roi_vs_net2_plus_handicap, c.roi_vs_net2_minus_handicap,
+        c.roi_vs_net3_match, c.roi_vs_net3_plus_handicap, c.roi_vs_net3_minus_handicap,
+        c.roi_vs_net4_match, c.roi_vs_net4_plus_handicap, c.roi_vs_net4_minus_handicap,
+        c.roi_vs_serve1_match, c.roi_vs_serve1_plus_handicap, c.roi_vs_serve1_minus_handicap,
+        c.roi_vs_serve2_match, c.roi_vs_serve2_plus_handicap, c.roi_vs_serve2_minus_handicap,
+        c.roi_vs_serve3_match, c.roi_vs_serve3_plus_handicap, c.roi_vs_serve3_minus_handicap,
+        c.roi_vs_serve4_match, c.roi_vs_serve4_plus_handicap, c.roi_vs_serve4_minus_handicap,
+        c.roi_vs_serve5_match, c.roi_vs_serve5_plus_handicap, c.roi_vs_serve5_minus_handicap
+    from pivoted_roi p
+    left join cluster_pivot c
+    on p.player_name = c.player_name
 )
 
--- Final selection with all columns
-SELECT *
-FROM pivoted_roi
+select * from final_roi

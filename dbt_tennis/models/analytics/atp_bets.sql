@@ -106,8 +106,8 @@ roi_data as (
     roi_vs_serve4_match, roi_vs_serve4_plus_handicap, roi_vs_serve4_minus_handicap,
     roi_vs_serve5_match, roi_vs_serve5_plus_handicap, roi_vs_serve5_minus_handicap,
     -- Special conditions
-    grand_slam_match_win_roi, grand_slam_plus_handicap_roi, grand_slam_minus_handicap_roi,
-    home_match_win_roi, home_plus_handicap_roi, home_minus_handicap_roi
+    grand_slam_match_win_roi,
+    home_match_win_roi,
   from atp_roi as a
   left join atp_players as p on a.player_name = p.player_name
 ),
