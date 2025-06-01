@@ -50,6 +50,10 @@ atp_roi as (
   select * from {{ ref('atp_roi') }}
 ),
 
+atp_players as (
+  select * from {{ ref('atp_players') }}
+),
+
 atp_matches_count as (
   select * from {{ ref('atp_matches_count') }}
 ),
@@ -67,7 +71,8 @@ clusters as (
 
 roi_data as (
   select
-    player_name,
+    a.player_name,
+    p.is_left_handed,
     -- Overall ROIs (against all opponents)
     overall_match_win_roi,
     overall_plus_handicap_roi,
@@ -103,13 +108,15 @@ roi_data as (
     -- Special conditions
     grand_slam_match_win_roi, grand_slam_plus_handicap_roi, grand_slam_minus_handicap_roi,
     home_match_win_roi, home_plus_handicap_roi, home_minus_handicap_roi
-  from atp_roi
+  from atp_roi as a
+  left join atp_players as p on a.player_name = p.player_name
 ),
 
 base_matches as (
   select
     po.event_id,
     po.tournament_round,
+    ap.tournament_tier,
     ap.surface,
     datetime_sub(po.match_start_at, interval 3 hour) as match_start_at,
     po.p1_name,
@@ -145,7 +152,8 @@ match_clusters as (
 roi_enhancements as (
   select
     mc.*,
-
+    r1.is_left_handed as p1_is_left_handed,
+    r2.is_left_handed as p2_is_left_handed,
     -- NEW: Overall ROIs for Player 1
     r1.overall_match_win_roi as p1_overall_match_roi,
     r1.overall_plus_handicap_roi as p1_overall_plus_handicap_roi,
@@ -238,29 +246,33 @@ roi_enhancements as (
 select
 --   event_id,
   tournament_round,
+  tournament_tier,
+  surface,
   match_start_at,
   p1_name,
   p2_name,
+  p1_is_left_handed,
+  p2_is_left_handed,
   100*greatest(
         p1_model_prob - p1_implied_prob,
         p2_model_prob - p2_implied_prob
         ) as diff,
   round(p1_pinnacle_odds, 2) as p1_pinnacle_odds,
   round(p2_pinnacle_odds, 2) as p2_pinnacle_odds,
---   p1_implied_prob,
---   p2_implied_prob,
---   p1_model_prob,
---   p2_model_prob,
+  p1_implied_prob,
+  p2_implied_prob,
+  p1_model_prob,
+  p2_model_prob,
   round(p1_model_odds, 2) as p1_model_odds,
   round(p2_model_odds, 2) as p2_model_odds,
 
 --   -- Cluster information
---   p1_rally_cluster,
---   p1_net_cluster,
---   p1_serve_cluster,
---   p2_rally_cluster,
---   p2_net_cluster,
---   p2_serve_cluster,
+  p1_rally_cluster,
+  p1_net_cluster,
+  p1_serve_cluster,
+  p2_rally_cluster,
+  p2_net_cluster,
+  p2_serve_cluster,
 
 -- NEW: Overall ROI metrics
   round(p1_overall_match_roi, 2) as p1_overall_match_roi,

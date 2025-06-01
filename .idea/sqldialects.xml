@@ -48,7 +48,6 @@
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_stats.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_today.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_tournaments.sql" dialect="GenericSQL" />
-    <file url="file://$PROJECT_DIR$/dbt_tennis/target/run/dbt_tennis/models/analytics/atp_roi_v.sql" dialect="BigQuery" />
     <file url="PROJECT" dialect="BigQuery" />
   </component>
 </project>
