@@ -37,6 +37,10 @@ rounds as (
   select * from {{ source('raw_layer', 'rounds') }}
 ),
 
+rankings_atp as (
+  select * from {{ source('raw_layer', 'rankings_atp') }}
+),
+
 atp_serve_dependency_clusters as (
   select * from {{ source('raw_layer', 'atp_serve_dependency_clusters') }}
 ),
@@ -76,8 +80,8 @@ final as (
 --       e1.seed_number as p1_seed_number,
 --       if(e2.entry_status is null, 'Direct Acceptance', e2.entry_status) as p2_entry_status,
 --       e2.seed_number as p2_seed_number,
---       r1.ranking_position as p1_ranking,
---       r2.ranking_position as p2_ranking,
+      r1.ranking_position as p1_ranking,
+      r2.ranking_position as p2_ranking,
       m.result,
       (
         select sum(cast(number as int64))
@@ -123,10 +127,10 @@ final as (
 --       left join atp_odds as o on m.match_id = o.match_id
       left join atp_odds as o1 on m.match_id = o1.match_id_1
       left join atp_odds as o2 on m.match_id = o2.match_id_2
---       left join rankings_atp as r1 on m.player_1_id = r1.player_id
---         and m.match_date between r1.ranking_date and date_add(r1.ranking_date, interval 6 day)
---       left join rankings_atp as r2 on m.player_2_id = r2.player_id
---         and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
+      left join rankings_atp as r1 on m.player_1_id = r1.player_id
+        and m.match_date between r1.ranking_date and date_add(r1.ranking_date, interval 6 day)
+      left join rankings_atp as r2 on m.player_2_id = r2.player_id
+        and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
       left join rounds as r on m.round_id = r.round_id
       left join atp_serve_dependency_clusters as cs1 on p1.player_name = cs1.player_name
       left join atp_serve_dependency_clusters as cs2 on p2.player_name = cs2.player_name

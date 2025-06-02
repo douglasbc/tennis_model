@@ -300,3 +300,4 @@ select
   round(p2_home_roi, 2) as p2_home_roi
 
 from roi_enhancements
+where tournament_tier <> 'Future' and tournament_tier not like 'ITF Women Santo Domingo%'

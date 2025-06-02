@@ -1,0 +1,62 @@
+{{ config(
+    materialized = 'table',
+    schema = 'analytics',
+)}}
+
+with
+
+atp_bets_players as (
+    select p1_name as player_name from {{ ref('atp_bets') }}
+    union all
+    select p2_name as player_name from {{ ref('atp_bets') }}
+),
+
+wta_bets_players as (
+    select p1_name as player_name from {{ ref('wta_bets') }}
+    union all
+    select p2_name as player_name from {{ ref('wta_bets') }}
+),
+
+atp_matches as (
+    select
+        'ATP' as tour, match_date, tournament_name, tournament_tier, surface, p1_name as player_name, p2_name as opponent, 1 as win, result as score, p1_win_match_odds as odds, p1_ranking as player_ranking, p2_ranking as opponent_ranking
+    from {{ ref('atp_matches') }}
+    where
+        p1_name in (select * from atp_bets_players)
+       or p2_name in (select * from atp_bets_players)
+      and match_date >= '2022-12-28'
+
+    union all
+
+    select
+        'ATP' as tour, match_date, tournament_name, tournament_tier, surface, p1_name as opponent, p2_name as player_name, 0 as win, result as score, p2_win_match_odds as odds, p1_ranking as opponent_ranking, p2_ranking as player_ranking
+    from {{ ref('atp_matches') }}
+    where
+        p1_name in (select * from atp_bets_players)
+       or p2_name in (select * from atp_bets_players)
+      and match_date >= '2022-12-28'
+        ),
+
+wta_matches as (
+    select
+        'WTA' as tour, match_date, tournament_name, tournament_tier, surface, p1_name as player_name, p2_name as opponent, 1 as win, result as score, p1_win_match_odds as odds, p1_ranking as player_ranking, p2_ranking as opponent_ranking
+    from {{ ref('wta_matches') }}
+    where
+        p1_name in (select * from wta_bets_players)
+       or p2_name in (select * from wta_bets_players)
+      and match_date >= '2022-12-28'
+
+    union all
+
+    select
+        'WTA' as tour, match_date, tournament_name, tournament_tier, surface, p1_name as opponent, p2_name as player_name, 0 as win, result as score, p2_win_match_odds as odds, p1_ranking as opponent_ranking, p2_ranking as player_ranking
+    from {{ ref('wta_matches') }}
+    where
+        p1_name in (select * from wta_bets_players)
+       or p2_name in (select * from wta_bets_players)
+      and match_date >= '2022-12-28'
+        )
+
+select * from atp_matches
+union all select * from wta_matches
+

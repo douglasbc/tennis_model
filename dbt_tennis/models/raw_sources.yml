@@ -23,6 +23,7 @@ sources:
       - name: atp_serve_dependency_clusters
       - name: atp_rally_aggression_clusters
       - name: atp_net_points_clusters
+      - name: rankings_atp
       - name: categories_wta
       - name: matches_wta
       - name: odds_wta
@@ -35,3 +36,4 @@ sources:
       - name: wta_serve_dependency_clusters
       - name: wta_rally_aggression_clusters
       - name: wta_net_points_clusters
+      - name: rankings_wta
