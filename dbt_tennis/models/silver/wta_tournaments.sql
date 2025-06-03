@@ -53,32 +53,13 @@ final as (
     cc.country,
     c.surface,
     case
-      when t.tournament_name like '%Laver Cup%'
-        then 'Laver Cup'
+      when t.tournament_level = 6
+        then 'Exhibition'
       when t.tournament_level = 5
-        then 'Davis Cup'
-      when t.tournament_level = 4
-        then 'Grand Slam'
-      when t.tournament_level = 1
-        then 'Challenger'
-      when t.tournament_level = 0
-        then 'Future'
-      when t.tournament_tier like '%wta World Tour 250%'
-        then 'wta 250'
-      when t.tournament_tier like '%wta World Tour 500%'
-        then 'wta 500'
-      when t.tournament_tier like '%Masters 1000%'
-        then 'Masters 1000'
-      when t.tournament_id in (8912, 8052)
-        then 'wta World Team Cup'
-      when t.tournament_tier like '%wta Cup%'
-        then 'wta Cup'
-      when t.tournament_tier like '%wta World Tour Finals%'
-        then 'wta Finals'
-      when t.tournament_tier like '%Finals%'
-        then 'Next Gen wta Finals'
-      else t.tournament_tier
+        then 'Billie Jean King Cup'
+      else trim(t.tournament_tier)
     end as tournament_tier,
+    t.tournament_level,
     t.tournament_prize,
 --     t.tournament_latitude,
 --     t.tournament_longitude,

@@ -77,9 +77,9 @@ final as (
         then 'ATP Finals'
       when t.tournament_tier like '%Finals%'
         then 'Next Gen ATP Finals'
-      else t.tournament_tier
+      else trim(t.tournament_tier)
     end as tournament_tier,
-    t.tournament_prize,
+    t.tournament_level,
 --     t.tournament_latitude,
 --     t.tournament_longitude,
 --     ec.elevation as tournament_elevation,

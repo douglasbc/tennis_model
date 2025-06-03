@@ -307,63 +307,37 @@ def style_history_row(row):
 def render_player_history(history, player_name):
     st.subheader(f"{player_name}'s Match History")
 
-    # Create filters in expander - no default filtering
+    # Create filters in expander - only surface filter with tick boxes
     with st.expander("Filter History", expanded=False):
-        col1, col2 = st.columns(2)
+        # Surface filter - all unchecked by default
+        all_surfaces = history['surface'].unique().tolist()
+        surface_colors = {
+            'Clay': '#F4A460',    # RGB: 244, 164, 96
+            'Grass': '#66CDAA',   # RGB: 102, 205, 170
+            'Hard': '#1E90FF',    # RGB: 30, 144, 255
+            'Indoor Hard': '#87CEEB'  # RGB: 135, 206, 235
+        }
 
-        with col1:
-            # Opponent ranking filter - full range by default
-            min_rank, max_rank = st.slider(
-                "Opponent Ranking Range",
-                min_value=1,
-                max_value=1000,
-                value=(1, 1000),
-                key=f"rank_{player_name}"
-            )
+        # Get available surfaces (in case some are missing)
+        available_surfaces = [s for s in surface_colors.keys() if s in all_surfaces]
 
-            # Tournament tier filter - all selected by default
-            all_tiers = history['tournament_tier'].unique().tolist()
-            selected_tiers = st.multiselect(
-                "Tournament Tiers",
-                options=all_tiers,
-                default=all_tiers,
-                key=f"tiers_{player_name}"
-            )
+        # Create checkboxes (all unchecked by default)
+        selected_surfaces = st.multiselect(
+            "Filter by Surface:",
+            options=available_surfaces,
+            default=[],
+            key=f"surfaces_{player_name}"
+        )
 
-        with col2:
-            # Odds filter - full range by default
-            min_odds, max_odds = st.slider(
-                "Match Odds Range",
-                min_value=1.0,
-                max_value=50.0,
-                value=(1.0, 50.0),
-                key=f"odds_{player_name}"
-            )
-
-            # Surface filter - all selected by default
-            all_surfaces = history['surface'].unique().tolist()
-            selected_surfaces = st.multiselect(
-                "Surfaces",
-                options=all_surfaces,
-                default=all_surfaces,
-                key=f"surfaces_{player_name}"
-            )
-
-    # Apply filters only if changed from defaults
+    # Apply filters only if surfaces are selected
     filtered = history.copy()
-    if min_rank != 1 or max_rank != 500:
-        filtered = filtered[filtered['opponent_ranking'].between(min_rank, max_rank)]
-    if set(selected_tiers) != set(all_tiers):
-        filtered = filtered[filtered['tournament_tier'].isin(selected_tiers)]
-    if min_odds != 1.0 or max_odds != 10.0:
-        filtered = filtered[filtered['odds'].between(min_odds, max_odds)]
-    if set(selected_surfaces) != set(all_surfaces):
+    if selected_surfaces:
         filtered = filtered[filtered['surface'].isin(selected_surfaces)]
 
-    # Format columns - check if 'opponent' column exists, otherwise use 'p2_name'
+    # Format columns - keep all original columns but only show relevant ones
     display_cols = [
         'match_date', 'tournament_name', 'tournament_tier', 'surface',
-        'opponent' if 'opponent' in filtered.columns else 'p2_name', 
+        'opponent' if 'opponent' in filtered.columns else 'p2_name',
         'player_ranking',
         'opponent_ranking', 'odds', 'win', 'score'
     ]
@@ -372,6 +346,9 @@ def render_player_history(history, player_name):
     if not filtered.empty:
         filtered['match_date'] = pd.to_datetime(filtered['match_date']).dt.strftime('%Y-%m-%d')
         filtered['win'] = filtered['win'].apply(lambda x: 'Win' if x == 1 else 'Loss')
+
+        # Format odds to 2 decimal places
+        filtered['odds'] = filtered['odds'].round(2)
 
         # Convert rankings to string, handling null values properly
         filtered['player_ranking'] = filtered['player_ranking'].astype('Int64').astype(str).replace('<NA>', '')
@@ -391,9 +368,29 @@ def render_player_history(history, player_name):
             'score': 'Score'
         })
 
-        # Apply styling with black text
-        styled_df = display_df.style.apply(style_history_row, axis=1)
+        # Apply styling with surface colors
+        def style_history_row(row):
+            # Win/loss coloring
+            base_color = '#d4edda' if row['Result'] == 'Win' else '#f8d7da'
 
+            # Surface coloring
+            surface_colors = {
+                'Clay': '#F4A460',    # Sandy Brown
+                'Grass': '#66CDAA',   # Medium Aquamarine
+                'Hard': '#1E90FF',    # Dodger Blue
+                'Indoor Hard': '#87CEEB'  # Sky Blue
+            }
+
+            styles = [f'background-color: {base_color}; color: black'] * len(row)
+
+            # Apply surface color if available
+            surface_idx = list(row.index).index('Surface')
+            if row['Surface'] in surface_colors:
+                styles[surface_idx] = f'background-color: {surface_colors[row["Surface"]]}; color: black'
+
+            return styles
+
+        styled_df = display_df.style.apply(style_history_row, axis=1)
         st.dataframe(styled_df, height=400)
     else:
         st.info("No matches found with current filters")
@@ -622,16 +619,46 @@ def main():
         cols[3].write(f"**{row['p1_name']}** vs **{row['p2_name']}**")
         cols[4].write(f"{row['surface']}")
 
+        # Helper function to format value and determine color
+        def format_value_with_color(value):
+            try:
+                # Handle string values with % sign or arrows
+                if isinstance(value, str):
+                    clean_value = value.replace('%', '').replace('↑', '').replace('↓', '').strip()
+                    numeric_value = float(clean_value)
+                else:
+                    numeric_value = float(value)
+
+                # Format as percentage with 1 decimal place
+                formatted_value = f"{numeric_value:.1f}%"
+
+                # Determine color
+                color = "green" if numeric_value > 0 else "red" if numeric_value < 0 else "black"
+
+                return formatted_value, color
+            except (ValueError, TypeError):
+                return str(value), "black"
+
+        # Format Diff column (convert to percentage)
+        diff_value, diff_color = format_value_with_color(row['Diff'])
+        cols[5].markdown(f"<span style='color:{diff_color}'>{diff_value}</span>", unsafe_allow_html=True)
+
         # Player 1 odds and ROI
-        cols[5].write(f"P1 P: {row['p1_pinnacle_odds']:.2f}")
-        cols[6].write(f"P1 M: {row['p1_model_odds']:.2f}")
-        cols[7].write(f"P1 ROI: {p1_cluster_display}")
+        cols[6].write(f"P1 P: {row['p1_pinnacle_odds']:.2f}")
+        cols[7].write(f"P1 M: {row['p1_model_odds']:.2f}")
+
+        # Format p1_cluster_display
+        p1_value, p1_color = format_value_with_color(p1_cluster_display)
+        cols[8].markdown(f"<span style='color:{p1_color}'>P1 ROI: {p1_value}</span>", unsafe_allow_html=True)
 
         # Player 2 odds and ROI
-        cols[8].write(f"P2 P: {row['p2_pinnacle_odds']:.2f}")
-        cols[9].write(f"P2 M: {row['p2_model_odds']:.2f}")
-        cols[10].write(f"P2 ROI: {p2_cluster_display}")
-        cols[11].write(row['Diff'])
+        cols[9].write(f"P2 P: {row['p2_pinnacle_odds']:.2f}")
+        cols[10].write(f"P2 M: {row['p2_model_odds']:.2f}")
+
+        # Format p2_cluster_display
+        p2_value, p2_color = format_value_with_color(p2_cluster_display)
+        cols[11].markdown(f"<span style='color:{p2_color}'>P2 ROI: {p2_value}</span>", unsafe_allow_html=True)
+
 
         if cols[0].button("Analyze", key=f"analyze_{row['p1_name']}_{row['p2_name']}_{row['match_start_at']}"):
             st.session_state.selected_match = row

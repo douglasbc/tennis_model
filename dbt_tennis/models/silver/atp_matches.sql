@@ -68,6 +68,7 @@ final as (
         else t.surface
       end as surface,
       t.tournament_tier,
+      t.tournament_level,
 --       t.tournament_elevation,
 --       w.avg_apparent_temperature,
 --       w.avg_relative_humidity,
