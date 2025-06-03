@@ -5,7 +5,7 @@ google-cloud-bigquery
 google-cloud-bigquery-storage
 #jax==0.4.17
 #jaxlib==0.4.17
-#matplotlib
+matplotlib
 numpy==1.26.4
 #openmeteo-requests
 pandas
