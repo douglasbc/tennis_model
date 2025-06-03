@@ -19,7 +19,7 @@ wta_bets_players as (
 
 atp_matches as (
     select
-        'ATP' as tour, match_date, tournament_name, tournament_tier, surface, p1_name, p2_name, result as score, p1_win_match_odds, p2_win_match_odds, p1_ranking, p2_ranking
+        'ATP' as tour, match_date, tournament_name, tournament_tier, tournament_level, round, surface, p1_name, p2_name, result as score, p1_win_match_odds, p2_win_match_odds, p1_ranking, p2_ranking
     from {{ ref('atp_matches') }}
     where
         p1_name in (select * from atp_bets_players)
@@ -29,7 +29,7 @@ atp_matches as (
 
 wta_matches as (
     select
-        'WTA' as tour, match_date, tournament_name, tournament_tier, surface, p1_name, p2_name, result as score, p1_win_match_odds, p2_win_match_odds, p1_ranking, p2_ranking
+        'WTA' as tour, match_date, tournament_name, tournament_tier, tournament_level, round, surface, p1_name, p2_name, result as score, p1_win_match_odds, p2_win_match_odds, p1_ranking, p2_ranking
     from {{ ref('wta_matches') }}
     where
         p1_name in (select * from wta_bets_players)

@@ -337,21 +337,13 @@ def render_player_history(history, player_name):
     if selected_surfaces:
         filtered = filtered[filtered['surface'].isin(selected_surfaces)]
 
-    # Create dynamic columns - ALWAYS show profile player's odds as Odds 1
+    # Create dynamic columns
     filtered['Player1'] = np.where(filtered['win'] == 1, filtered['player_name'], filtered['opponent'])
     filtered['Player2'] = np.where(filtered['win'] == 1, filtered['opponent'], filtered['player_name'])
     filtered['R1'] = np.where(filtered['win'] == 1, filtered['player_ranking'], filtered['opponent_ranking'])
     filtered['R2'] = np.where(filtered['win'] == 1, filtered['opponent_ranking'], filtered['player_ranking'])
-
-    # ALWAYS show profile player's odds as Odds 1
-    filtered['Odds1'] = np.where(filtered['player_name'] == filtered['p1_name'],
-                                filtered['p1_win_match_odds'],
-                                filtered['p2_win_match_odds'])
-
-    # ALWAYS show opponent's odds as Odds 2
-    filtered['Odds2'] = np.where(filtered['player_name'] == filtered['p1_name'],
-                                filtered['p2_win_match_odds'],
-                                filtered['p1_win_match_odds'])
+    filtered['Odds1'] = np.where(filtered['win'] == 1, filtered['p1_win_match_odds'], filtered['p2_win_match_odds'])
+    filtered['Odds2'] = np.where(filtered['win'] == 1, filtered['p2_win_match_odds'], filtered['p1_win_match_odds'])
 
     # Format columns
     filtered['R1'] = filtered['R1'].astype('Int64').astype(str).replace('<NA>', '')
@@ -405,10 +397,10 @@ def render_player_history(history, player_name):
                 styles[player2_idx] = 'background-color: white; color: black'
                 styles[r2_idx] = 'background-color: white; color: black'
             else:  # Player lost
-                styles[player1_idx] = 'background-color: white; color: black'
-                styles[r1_idx] = 'background-color: white; color: black'
                 styles[player2_idx] = 'background-color: #f8d7da; color: black'  # Light red
                 styles[r2_idx] = 'background-color: #f8d7da; color: black'        # Light red
+                styles[player1_idx] = 'background-color: white; color: black'
+                styles[r1_idx] = 'background-color: white; color: black'
 
             # Surface coloring
             surface_colors = {
@@ -507,14 +499,14 @@ def render_player_roi(roi_data, player_name, surface, is_left_handed_opponent, o
 
     # Cluster ROIs section
     st.markdown("**Cluster ROIs vs Opponent:**", unsafe_allow_html=True)
-    
+
     rally_cluster, net_cluster, serve_cluster = opponent_clusters
     total_cluster_roi = 0
     valid_clusters = 0
-    
+
     # Always show all 3 cluster types, even if some are missing
     cluster_display = []
-    
+
     # Rally cluster
     if not pd.isna(rally_cluster):
         col_name = f'roi_vs_rally{int(rally_cluster)}_match'
@@ -600,33 +592,27 @@ def render_head_to_head(h2h_df, player1, player2):
     h2h_df['Date'] = pd.to_datetime(h2h_df['match_date']).dt.strftime('%Y-%m-%d')
 
     # Reorder columns
-    display_df = h2h_df[['Player 1', 'R1', 'Player 2', 'R2', 'tournament_name', 'tournament_level',
-                         'Date', 'round', 'surface', 'score', 'Odds 1', 'Odds 2']]
-    display_df.columns = ['Player 1', 'R1', 'Player 2', 'R2', 'Tournament', 'Level',
-                          'Date', 'Round', 'Surface', 'Score', 'Odds 1', 'Odds 2']
+    display_df = h2h_df[['Player 1', 'R1', 'Player 2', 'R2', 'tournament_name', 'Date',
+                         'round', 'surface', 'score', 'Odds 1', 'Odds 2']]
+    display_df.columns = ['Player 1', 'R1', 'Player 2', 'R2', 'Tournament', 'Date',
+                          'Round', 'Surface', 'Score', 'Odds 1', 'Odds 2']
 
     # Style the DataFrame
     def style_h2h_row(row):
         # Initialize all styles to white background, black text
         styles = ['background-color: white; color: black'] * len(row)
 
-        # Get indices of player columns
+        # Color Player 1 (winner) green
         player1_idx = list(row.index).index('Player 1')
-        player2_idx = list(row.index).index('Player 2')
         r1_idx = list(row.index).index('R1')
-        r2_idx = list(row.index).index('R2')
+        styles[player1_idx] = 'background-color: #d4edda; color: black'  # Light green
+        styles[r1_idx] = 'background-color: #d4edda; color: black'      # Light green
 
-        # Apply coloring based on player1 (the first player in comparison)
-        if row['Player 1'] == player1:  # Player1 won the match
-            styles[player1_idx] = 'background-color: #d4edda; color: black'  # Light green
-            styles[r1_idx] = 'background-color: #d4edda; color: black'      # Light green
-            styles[player2_idx] = 'background-color: white; color: black'
-            styles[r2_idx] = 'background-color: white; color: black'
-        else:  # Player1 lost the match (so Player 2 is the focus player)
-            styles[player1_idx] = 'background-color: white; color: black'
-            styles[r1_idx] = 'background-color: white; color: black'
-            styles[player2_idx] = 'background-color: #f8d7da; color: black'  # Light red
-            styles[r2_idx] = 'background-color: #f8d7da; color: black'      # Light red
+        # Color Player 2 (loser) red
+        player2_idx = list(row.index).index('Player 2')
+        r2_idx = list(row.index).index('R2')
+        styles[player2_idx] = 'background-color: #f8d7da; color: black'  # Light red
+        styles[r2_idx] = 'background-color: #f8d7da; color: black'      # Light red
 
         # Tournament level coloring
         tournament_level_colors = {
@@ -671,9 +657,8 @@ def render_head_to_head(h2h_df, player1, player2):
 
         # Apply tournament level color
         tournament_idx = list(row.index).index('Tournament')
-        level = row['Level']
-        if level in tournament_level_colors:
-            styles[tournament_idx] = f'background-color: {tournament_level_colors[level]}; color: black'
+        # Since we don't have tournament_level in display, we skip this coloring
+        # If you want to add it, you'll need to include it in the DataFrame
 
         # Apply round color
         round_idx = list(row.index).index('Round')
@@ -685,10 +670,6 @@ def render_head_to_head(h2h_df, player1, player2):
         surface_idx = list(row.index).index('Surface')
         if row['Surface'] in surface_colors:
             styles[surface_idx] = f'background-color: {surface_colors[row["Surface"]]}; color: black'
-
-        # Hide Level column by making width 0
-        level_idx = list(row.index).index('Level')
-        styles[level_idx] = 'width: 0px; padding: 0px; margin: 0px; border: 0px;'
 
         return styles
 
