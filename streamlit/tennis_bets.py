@@ -337,27 +337,29 @@ def render_player_history(history, player_name):
     if selected_surfaces:
         filtered = filtered[filtered['surface'].isin(selected_surfaces)]
 
-    # Create dynamic columns - ALWAYS show profile player's odds as Odds 1
+    # Create dynamic columns - ALWAYS show winner's odds as Odds 1
     filtered['Player1'] = np.where(filtered['win'] == 1, filtered['player_name'], filtered['opponent'])
     filtered['Player2'] = np.where(filtered['win'] == 1, filtered['opponent'], filtered['player_name'])
     filtered['R1'] = np.where(filtered['win'] == 1, filtered['player_ranking'], filtered['opponent_ranking'])
     filtered['R2'] = np.where(filtered['win'] == 1, filtered['opponent_ranking'], filtered['player_ranking'])
 
-    # ALWAYS show profile player's odds as Odds 1
-    filtered['Odds1'] = np.where(filtered['player_name'] == filtered['p1_name'],
+    # ALWAYS show winner's odds as Odds 1
+    filtered['Odds1'] = np.where(filtered['win'] == 1,
                                 filtered['p1_win_match_odds'],
                                 filtered['p2_win_match_odds'])
 
-    # ALWAYS show opponent's odds as Odds 2
-    filtered['Odds2'] = np.where(filtered['player_name'] == filtered['p1_name'],
+    # ALWAYS show loser's odds as Odds 2
+    filtered['Odds2'] = np.where(filtered['win'] == 1,
                                 filtered['p2_win_match_odds'],
                                 filtered['p1_win_match_odds'])
 
     # Format columns
     filtered['R1'] = filtered['R1'].astype('Int64').astype(str).replace('<NA>', '')
     filtered['R2'] = filtered['R2'].astype('Int64').astype(str).replace('<NA>', '')
-    filtered['Odds1'] = filtered['Odds1'].round(2)
-    filtered['Odds2'] = filtered['Odds2'].round(2)
+
+    # Format odds to 2 decimal places without extra zeros
+    filtered['Odds1'] = filtered['Odds1'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+    filtered['Odds2'] = filtered['Odds2'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
 
     # Format columns - keep all original columns but only show relevant ones
     display_cols = [
@@ -595,15 +597,18 @@ def render_head_to_head(h2h_df, player1, player2):
     h2h_df['Player 2'] = h2h_df['loser']
     h2h_df['R1'] = h2h_df['winner_ranking'].astype('Int64').astype(str).replace('<NA>', '')
     h2h_df['R2'] = h2h_df['loser_ranking'].astype('Int64').astype(str).replace('<NA>', '')
-    h2h_df['Odds 1'] = h2h_df['winner_odds'].round(2)
-    h2h_df['Odds 2'] = h2h_df['loser_odds'].round(2)
+
+    # Format odds to 2 decimal places without extra zeros
+    h2h_df['Odds 1'] = h2h_df['winner_odds'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+    h2h_df['Odds 2'] = h2h_df['loser_odds'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+
     h2h_df['Date'] = pd.to_datetime(h2h_df['match_date']).dt.strftime('%Y-%m-%d')
 
-    # Reorder columns
-    display_df = h2h_df[['Player 1', 'R1', 'Player 2', 'R2', 'tournament_name', 'tournament_level',
-                         'Date', 'round', 'surface', 'score', 'Odds 1', 'Odds 2']]
-    display_df.columns = ['Player 1', 'R1', 'Player 2', 'R2', 'Tournament', 'Level',
-                          'Date', 'Round', 'Surface', 'Score', 'Odds 1', 'Odds 2']
+    # Reorder columns - Level at the end
+    display_df = h2h_df[['Player 1', 'R1', 'Player 2', 'R2', 'tournament_name',
+                         'Date', 'round', 'surface', 'score', 'Odds 1', 'Odds 2', 'tournament_level']]
+    display_df.columns = ['Player 1', 'R1', 'Player 2', 'R2', 'Tournament',
+                          'Date', 'Round', 'Surface', 'Score', 'Odds 1', 'Odds 2', 'Level']
 
     # Style the DataFrame
     def style_h2h_row(row):
@@ -769,10 +774,25 @@ def main():
     # Display match count
     st.subheader(f"Upcoming Matches ({len(filtered_bets)})")
 
+    def format_diff(value):
+        try:
+            # Handle both float and string representations
+            if isinstance(value, str):
+                value = float(value.replace('↑', '').replace('↓', ''))
+
+            if value > 0:
+                return f"<span style='color:green'>{value:.2f}↑</span>"
+            elif value < 0:
+                return f"<span style='color:red'>{abs(value):.2f}↓</span>"
+            else:
+                return "0.00"
+        except (ValueError, TypeError):
+            return str(value)
+
     # Create formatted display
     display_df = filtered_bets.copy()
     display_df['Date'] = pd.to_datetime(display_df['match_start_at']).dt.strftime('%Y-%m-%d %H:%M')
-    display_df['Diff'] = display_df['diff'].apply(lambda x: f"{x:.2f}↑" if x > 0 else f"{abs(x):.2f}↓" if x < 0 else "0.00")
+    # display_df['Diff'] = display_df['diff'].apply(lambda x: f"{x:.2f}↑" if x > 0 else f"{abs(x):.2f}↓" if x < 0 else "0.00")
 
     # Display matches in a table
     for _, row in display_df.iterrows():
@@ -800,6 +820,11 @@ def main():
         cols[3].write(f"**{row['p1_name']}** vs **{row['p2_name']}**")
         cols[4].write(f"{row['surface']}")
 
+        # Format Diff column
+        diff_value = row['diff']
+        diff_display = format_diff(diff_value)
+        cols[5].markdown(diff_display, unsafe_allow_html=True)
+
         # Helper function to format value and determine color
         def format_value_with_color(value):
             try:
@@ -821,8 +846,8 @@ def main():
                 return str(value), "black"
 
         # Format Diff column (convert to percentage)
-        diff_value, diff_color = format_value_with_color(row['Diff'])
-        cols[5].markdown(f"<span style='color:{diff_color}'>{diff_value}</span>", unsafe_allow_html=True)
+        # diff_value, diff_color = format_value_with_color(row['Diff'])
+        # cols[5].markdown(f"<span style='color:{diff_color}'>{diff_value}</span>", unsafe_allow_html=True)
 
         # Player 1 odds and ROI
         cols[6].write(f"P1 P: {row['p1_pinnacle_odds']:.2f}")
@@ -884,44 +909,44 @@ def main():
                 match['surface'], match['p1_is_left_handed'], p1_clusters
             )
 
-        # Value analysis
-        st.subheader("Value Analysis")
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if not p1_roi.empty:
-                model_prob = 1 / match['p1_model_odds']
-                implied_prob = 1 / match['p1_pinnacle_odds']
-                value = model_prob - implied_prob
-                st.metric(f"{match['p1_name']} Value",
-                         f"{value*100:.1f}%",
-                         delta="Positive Value" if value > 0 else "Negative Value",
-                         delta_color="normal")
-
-        with col2:
-            if not p2_roi.empty:
-                model_prob = 1 / match['p2_model_odds']
-                implied_prob = 1 / match['p2_pinnacle_odds']
-                value = model_prob - implied_prob
-                st.metric(f"{match['p2_name']} Value",
-                         f"{value*100:.1f}%",
-                         delta="Positive Value" if value > 0 else "Negative Value",
-                         delta_color="normal")
-
-        # Bet recommendation
-        st.subheader("Betting Recommendation")
-        if not p1_roi.empty and not p2_roi.empty:
-            p1_value = (1 / match['p1_model_odds'] - 1/match['p1_pinnacle_odds']) * 100
-            p2_value = (1 / match['p2_model_odds'] - 1/match['p2_pinnacle_odds']) * 100
-
-            if p1_value > 0 and p1_value > p2_value:
-                st.success(f"✅ Recommended Bet: **{match['p1_name']}** (Value: {p1_value:.1f}%)")
-            elif p2_value > 0 and p2_value > p1_value:
-                st.success(f"✅ Recommended Bet: **{match['p2_name']}** (Value: {p2_value:.1f}%)")
-            else:
-                st.warning("⚠️ No Clear Value Bet - Both players show negative or neutral value")
-        else:
-            st.info("Insufficient data for betting recommendation")
+        # # Value analysis
+        # st.subheader("Value Analysis")
+        # col1, col2 = st.columns(2)
+        #
+        # with col1:
+        #     if not p1_roi.empty:
+        #         model_prob = 1 / match['p1_model_odds']
+        #         implied_prob = 1 / match['p1_pinnacle_odds']
+        #         value = model_prob - implied_prob
+        #         st.metric(f"{match['p1_name']} Value",
+        #                  f"{value*100:.1f}%",
+        #                  delta="Positive Value" if value > 0 else "Negative Value",
+        #                  delta_color="normal")
+        #
+        # with col2:
+        #     if not p2_roi.empty:
+        #         model_prob = 1 / match['p2_model_odds']
+        #         implied_prob = 1 / match['p2_pinnacle_odds']
+        #         value = model_prob - implied_prob
+        #         st.metric(f"{match['p2_name']} Value",
+        #                  f"{value*100:.1f}%",
+        #                  delta="Positive Value" if value > 0 else "Negative Value",
+        #                  delta_color="normal")
+        #
+        # # Bet recommendation
+        # st.subheader("Betting Recommendation")
+        # if not p1_roi.empty and not p2_roi.empty:
+        #     p1_value = (1 / match['p1_model_odds'] - 1/match['p1_pinnacle_odds']) * 100
+        #     p2_value = (1 / match['p2_model_odds'] - 1/match['p2_pinnacle_odds']) * 100
+        #
+        #     if p1_value > 0 and p1_value > p2_value:
+        #         st.success(f"✅ Recommended Bet: **{match['p1_name']}** (Value: {p1_value:.1f}%)")
+        #     elif p2_value > 0 and p2_value > p1_value:
+        #         st.success(f"✅ Recommended Bet: **{match['p2_name']}** (Value: {p2_value:.1f}%)")
+        #     else:
+        #         st.warning("⚠️ No Clear Value Bet - Both players show negative or neutral value")
+        # else:
+        #     st.info("Insufficient data for betting recommendation")
 
         if st.button("← Back to Matches"):
             del st.session_state.selected_match
