@@ -32,12 +32,16 @@ select
   roi_vs_rally1_match,
   roi_vs_rally2_match,
   roi_vs_rally3_match,
+  roi_vs_rally4_match,
   roi_vs_net1_match,
   roi_vs_net2_match,
   roi_vs_net3_match,
+  roi_vs_net4_match,
   roi_vs_serve1_match,
   roi_vs_serve2_match,
-  roi_vs_serve3_match
+  roi_vs_serve3_match,
+  roi_vs_serve4_match,
+  roi_vs_serve5_match
 from {{ ref('atp_roi') }}
 where player_name in (select * from atp_bets_players)
 union all
@@ -54,11 +58,15 @@ select
   roi_vs_rally1_match,
   roi_vs_rally2_match,
   roi_vs_rally3_match,
+  roi_vs_rally4_match,
   roi_vs_net1_match,
   roi_vs_net2_match,
   roi_vs_net3_match,
+  null as roi_vs_net4_match,
   roi_vs_serve1_match,
   roi_vs_serve2_match,
-  roi_vs_serve3_match
+  roi_vs_serve3_match,
+  roi_vs_serve4_match,
+  null as roi_vs_serve5_match
 from {{ ref('wta_roi') }}
 where player_name in (select * from wta_bets_players)

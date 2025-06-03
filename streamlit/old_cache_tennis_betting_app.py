@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+import json
 import matplotlib.colors as mcolors
 from datetime import datetime, timedelta
 from google.cloud import bigquery
@@ -17,7 +18,6 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 BETS_CACHE = f"{CACHE_DIR}/live_bets.parquet"
 ROI_CACHE = f"{CACHE_DIR}/player_roi.parquet"
 HISTORY_CACHE = f"{CACHE_DIR}/matches_history.parquet"
-H2H_CACHE = f"{CACHE_DIR}/head_to_head.parquet"
 
 # Initialize cache
 def init_cache():
@@ -27,8 +27,6 @@ def init_cache():
         pd.DataFrame().to_parquet(ROI_CACHE)
     if not os.path.exists(HISTORY_CACHE):
         pd.DataFrame().to_parquet(HISTORY_CACHE)
-    if not os.path.exists(H2H_CACHE):
-        pd.DataFrame().to_parquet(H2H_CACHE)
 
 # --------------------------
 # BIGQUERY CLIENT
@@ -57,9 +55,9 @@ def load_live_bets(_client):
                            'p1_rally_cluster', 'p1_net_cluster', 'p1_serve_cluster',
                            'p2_rally_cluster', 'p2_net_cluster', 'p2_serve_cluster']
             if all(col in cached.columns for col in required_cols):
-                return cached.sort_values('match_start_at')  # Order by match time
+                return cached
 
-    # Query fresh data with ordering
+    # Query fresh data
     query = """
     SELECT 
         tour,
@@ -82,7 +80,6 @@ def load_live_bets(_client):
         p2_net_cluster,
         p2_serve_cluster
     FROM `tennis-358702.analytics.streamlit_bets`
-    ORDER BY match_start_at ASC
     """
     df = _client.query(query).to_dataframe()
     df.to_parquet(BETS_CACHE)
@@ -120,12 +117,11 @@ def load_matches_history(_client):
             cached = pd.read_parquet(HISTORY_CACHE)
             # Check if required columns exist
             required_cols = ['match_date', 'tournament_name', 'tournament_tier', 'surface',
-                           'p1_name', 'p2_name', 'win', 'score', 'odds',
+                           'player_name', 'opponent', 'win', 'score', 'odds',
                            'player_ranking', 'opponent_ranking', 'tour']
             if all(col in cached.columns for col in required_cols):
                 return cached
 
-    # Updated query to match your new dbt model
     query = """
     SELECT 
         match_date,
@@ -134,75 +130,16 @@ def load_matches_history(_client):
         surface,
         player_name,
         opponent,
-        p1_name,
-        p2_name,
         win,
         score,
-        CASE 
-            WHEN p1_name = player_name THEN p1_win_match_odds 
-            ELSE p2_win_match_odds 
-        END AS odds,
-        CASE 
-            WHEN p1_name = player_name THEN p1_ranking 
-            ELSE p2_ranking 
-        END AS player_ranking,
-        CASE 
-            WHEN p1_name = player_name THEN p2_ranking 
-            ELSE p1_ranking 
-        END AS opponent_ranking,
+        odds,
+        player_ranking,
+        opponent_ranking,
         tour
-    FROM (
-        SELECT *,
-            p1_name AS player_name,  -- First get wins
-            p2_name as opponent,
-            1 as win
-        FROM `tennis-358702.analytics.streamlit_matches`
-        UNION ALL
-        
-        SELECT *,
-            p2_name AS player_name,  -- Then get losses
-            p1_name as opponent,
-            0 as win
-        FROM `tennis-358702.analytics.streamlit_matches`
-    )
+    FROM `tennis-358702.analytics.streamlit_matches`
     """
     df = _client.query(query).to_dataframe()
     df.to_parquet(HISTORY_CACHE)
-    return df
-
-def load_head_to_head(_client, player1, player2, tour):
-    # Create a safe cache key
-    cache_key = f"{player1}_{player2}_{tour}".replace(" ", "_").replace("/", "_")
-    cache_file = f"{CACHE_DIR}/h2h_{cache_key}.parquet"
-
-    # Check if cache exists and is fresh (last 24 hours)
-    if os.path.exists(cache_file):
-        cache_time = datetime.fromtimestamp(os.path.getmtime(cache_file))
-        if datetime.now() - cache_time < timedelta(hours=24):
-            return pd.read_parquet(cache_file)
-
-    # Query BigQuery if cache is stale or missing
-    query = f"""
-    SELECT 
-        match_date,
-        tournament_name,
-        surface,
-        p1_name AS winner,
-        p2_name AS loser,
-        score,
-        p1_win_match_odds AS winner_odds,
-        p2_win_match_odds AS loser_odds
-    FROM `tennis-358702.analytics.streamlit_matches`
-    WHERE 
-        ((p1_name = '{player1}' AND p2_name = '{player2}')
-        OR (p1_name = '{player2}' AND p2_name = '{player1}'))
-        AND tour = '{tour}'
-    ORDER BY match_date DESC
-    """
-    df = _client.query(query).to_dataframe()
-
-    # Save to cache
-    df.to_parquet(cache_file)
     return df
 
 # --------------------------
@@ -210,16 +147,47 @@ def load_head_to_head(_client, player1, player2, tour):
 # --------------------------
 
 def get_player_history(history_df, player_name, tour):
+    """Get unique matches from player's perspective"""
     return history_df[
         (history_df['player_name'] == player_name) &
         (history_df['tour'] == tour)
-    ].sort_values('match_date', ascending=False)
+    ].sort_values('match_date', ascending=False).drop_duplicates(subset=['match_date', 'opponent'])
 
 def get_player_roi(roi_df, player_name, tour):
     return roi_df[
         (roi_df['player_name'] == player_name) &
         (roi_df['tour'] == tour)
     ]
+
+def format_roi(roi_value):
+    if pd.isna(roi_value) or roi_value is None:
+        return "N/A"
+    try:
+        roi_float = float(roi_value)
+        color = "green" if roi_float > 0 else "red" if roi_float < 0 else "gray"
+        return f"{roi_float:.1f}%"
+    except:
+        return "N/A"
+
+def format_diff(diff_value):
+    if pd.isna(diff_value) or diff_value is None:
+        return "0.00"
+    try:
+        diff_float = float(diff_value)
+        return f"{diff_float:.2f}↑" if diff_float > 0 else f"{abs(diff_float):.2f}↓" if diff_float < 0 else "0.00"
+    except:
+        return "0.00"
+
+def get_surface_roi_column(surface):
+    surface_map = {
+        "Clay": "clay",
+        "Grass": "grass",
+        "Hard": "hard",
+        "Carpet": "indoor_hard",
+        "Indoor Hard": "indoor_hard"
+    }
+    base = surface_map.get(surface, "hard")
+    return f"{base}_match_win_roi"
 
 def calculate_cluster_roi(roi_data, clusters):
     """Calculate sum of ROI against opponent's clusters"""
@@ -244,7 +212,7 @@ def calculate_cluster_roi(roi_data, clusters):
             total_roi += roi_data[col_name].iloc[0]
             valid_clusters += 1
 
-    # Serve cluster - FIXED
+    # Serve cluster
     if not pd.isna(serve_cluster):
         col_name = f'roi_vs_serve{int(serve_cluster)}_match'
         if col_name in roi_data.columns and not pd.isna(roi_data[col_name].iloc[0]):
@@ -255,6 +223,11 @@ def calculate_cluster_roi(roi_data, clusters):
         return "N/A"
 
     return total_roi
+
+# --------------------------
+# UI COMPONENTS
+# --------------------------
+
 
 def format_roi_with_color(roi_value):
     """Format ROI with color coding"""
@@ -267,20 +240,6 @@ def format_roi_with_color(roi_value):
     except:
         return "N/A"
 
-def get_surface_roi_column(surface):
-    surface_map = {
-        "Clay": "clay",
-        "Grass": "grass",
-        "Hard": "hard",
-        "Carpet": "indoor_hard",
-        "Indoor Hard": "indoor_hard"
-    }
-    base = surface_map.get(surface, "hard")
-    return f"{base}_match_win_roi"
-
-# --------------------------
-# UI COMPONENTS
-# --------------------------
 
 def style_history_row(row):
     # Win/loss coloring
@@ -296,32 +255,32 @@ def style_history_row(row):
         'Masters 1000': '#FFA07A' # Light Salmon
     }
 
-    # Apply colors with black text
-    styles = [f'background-color: {base_color}; color: black'] * len(row)
+    # Apply colors
+    styles = [f'background-color: {base_color}'] * len(row)
     tier_idx = list(row.index).index('Tier')
     tier_color = tier_colors.get(row['Tier'], base_color)
-    styles[tier_idx] = f'background-color: {tier_color}; color: black'
+    styles[tier_idx] = f'background-color: {tier_color}'
 
     return styles
 
 def render_player_history(history, player_name):
     st.subheader(f"{player_name}'s Match History")
 
-    # Create filters in expander - no default filtering
+    # Create filters in expander
     with st.expander("Filter History", expanded=False):
         col1, col2 = st.columns(2)
 
         with col1:
-            # Opponent ranking filter - full range by default
+            # Opponent ranking filter
             min_rank, max_rank = st.slider(
                 "Opponent Ranking Range",
                 min_value=1,
-                max_value=1000,
-                value=(1, 1000),
+                max_value=500,
+                value=(1, 500),
                 key=f"rank_{player_name}"
             )
 
-            # Tournament tier filter - all selected by default
+            # Tournament tier filter
             all_tiers = history['tournament_tier'].unique().tolist()
             selected_tiers = st.multiselect(
                 "Tournament Tiers",
@@ -331,16 +290,16 @@ def render_player_history(history, player_name):
             )
 
         with col2:
-            # Odds filter - full range by default
+            # Odds filter
             min_odds, max_odds = st.slider(
                 "Match Odds Range",
-                min_value=1.0,
-                max_value=50.0,
-                value=(1.0, 50.0),
+                min_value=float(history['odds'].min()) if not history.empty else 1.0,
+                max_value=float(history['odds'].max()) if not history.empty else 10.0,
+                value=(1.0, 10.0),
                 key=f"odds_{player_name}"
             )
 
-            # Surface filter - all selected by default
+            # Surface filter
             all_surfaces = history['surface'].unique().tolist()
             selected_surfaces = st.multiselect(
                 "Surfaces",
@@ -349,22 +308,17 @@ def render_player_history(history, player_name):
                 key=f"surfaces_{player_name}"
             )
 
-    # Apply filters only if changed from defaults
+    # Apply filters
     filtered = history.copy()
-    if min_rank != 1 or max_rank != 500:
-        filtered = filtered[filtered['opponent_ranking'].between(min_rank, max_rank)]
-    if set(selected_tiers) != set(all_tiers):
-        filtered = filtered[filtered['tournament_tier'].isin(selected_tiers)]
-    if min_odds != 1.0 or max_odds != 10.0:
-        filtered = filtered[filtered['odds'].between(min_odds, max_odds)]
-    if set(selected_surfaces) != set(all_surfaces):
-        filtered = filtered[filtered['surface'].isin(selected_surfaces)]
+    filtered = filtered[filtered['opponent_ranking'].between(min_rank, max_rank)]
+    filtered = filtered[filtered['tournament_tier'].isin(selected_tiers)]
+    filtered = filtered[filtered['odds'].between(min_odds, max_odds)]
+    filtered = filtered[filtered['surface'].isin(selected_surfaces)]
 
-    # Format columns - check if 'opponent' column exists, otherwise use 'p2_name'
+    # Format columns
     display_cols = [
         'match_date', 'tournament_name', 'tournament_tier', 'surface',
-        'opponent' if 'opponent' in filtered.columns else 'p2_name', 
-        'player_ranking',
+        'opponent', 'player_ranking',
         'opponent_ranking', 'odds', 'win', 'score'
     ]
 
@@ -377,145 +331,87 @@ def render_player_history(history, player_name):
         filtered['player_ranking'] = filtered['player_ranking'].astype('Int64').astype(str).replace('<NA>', '')
         filtered['opponent_ranking'] = filtered['opponent_ranking'].astype('Int64').astype(str).replace('<NA>', '')
 
-        # Create display DataFrame with renamed columns
-        display_df = filtered[display_cols].rename(columns={
-            'match_date': 'Date',
-            'tournament_name': 'Tournament',
-            'tournament_tier': 'Tier',
-            'surface': 'Surface',
-            'opponent' if 'opponent' in filtered.columns else 'p2_name': 'Opponent',
-            'player_ranking': 'Ranking',
-            'opponent_ranking': 'Opp Ranking',
-            'odds': 'Odds',
-            'win': 'Result',
-            'score': 'Score'
-        })
-
-        # Apply styling with black text
-        styled_df = display_df.style.apply(style_history_row, axis=1)
+        styled_df = (
+            filtered[display_cols]
+            .rename(columns={
+                'match_date': 'Date',
+                'tournament_name': 'Tournament',
+                'tournament_tier': 'Tier',
+                'surface': 'Surface',
+                'opponent': 'Opponent',
+                'player_ranking': 'Ranking',
+                'opponent_ranking': 'Opp Ranking',
+                'odds': 'Odds',
+                'win': 'Result',
+                'score': 'Score'
+            })
+            .style.apply(style_history_row, axis=1)
+        )
 
         st.dataframe(styled_df, height=400)
     else:
         st.info("No matches found with current filters")
+
 
 def render_player_roi(roi_data, player_name, surface, is_left_handed_opponent, opponent_clusters):
     if roi_data.empty:
         st.warning(f"No ROI data available for {player_name}")
         return
 
+    # Calculate cluster sum
+    cluster_sum = calculate_cluster_roi(roi_data, opponent_clusters)
+
     # Display all ROIs with color coding
     st.markdown(f"**Overall ROI:** {format_roi_with_color(roi_data['overall_match_win_roi'].iloc[0])}",
                 unsafe_allow_html=True)
 
-    # Surface ROI
     surface_col = get_surface_roi_column(surface)
     st.markdown(f"**{surface} ROI:** {format_roi_with_color(roi_data[surface_col].iloc[0])}",
                 unsafe_allow_html=True)
 
-    # Left-handed ROI if applicable
     if is_left_handed_opponent:
         st.markdown(f"**vs Left-Handed ROI:** {format_roi_with_color(roi_data['vs_left_handed_match_roi'].iloc[0])}",
                     unsafe_allow_html=True)
 
-    # Cluster ROIs section
     st.markdown("**Cluster ROIs vs Opponent:**", unsafe_allow_html=True)
-    
     rally_cluster, net_cluster, serve_cluster = opponent_clusters
-    total_cluster_roi = 0
-    valid_clusters = 0
-    
-    # Always show all 3 cluster types, even if some are missing
-    cluster_display = []
-    
+
+    # Display all available cluster ROIs
+    cluster_shown = False
+
     # Rally cluster
     if not pd.isna(rally_cluster):
         col_name = f'roi_vs_rally{int(rally_cluster)}_match'
-        if col_name in roi_data.columns:
-            roi_value = roi_data[col_name].iloc[0]
-            if not pd.isna(roi_value):
-                cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: {format_roi_with_color(roi_value)}")
-                total_cluster_roi += roi_value
-                valid_clusters += 1
-            else:
-                cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: No data")
-        else:
-            cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: Column missing")
-    else:
-        cluster_display.append("- Rally Cluster: Not available")
+        if col_name in roi_data.columns and not pd.isna(roi_data[col_name].iloc[0]):
+            st.markdown(f"- Rally Cluster {int(rally_cluster)}: {format_roi_with_color(roi_data[col_name].iloc[0])}",
+                        unsafe_allow_html=True)
+            cluster_shown = True
 
     # Net cluster
     if not pd.isna(net_cluster):
         col_name = f'roi_vs_net{int(net_cluster)}_match'
-        if col_name in roi_data.columns:
-            roi_value = roi_data[col_name].iloc[0]
-            if not pd.isna(roi_value):
-                cluster_display.append(f"- Net Cluster {int(net_cluster)}: {format_roi_with_color(roi_value)}")
-                total_cluster_roi += roi_value
-                valid_clusters += 1
-            else:
-                cluster_display.append(f"- Net Cluster {int(net_cluster)}: No data")
-        else:
-            cluster_display.append(f"- Net Cluster {int(net_cluster)}: Column missing")
-    else:
-        cluster_display.append("- Net Cluster: Not available")
+        if col_name in roi_data.columns and not pd.isna(roi_data[col_name].iloc[0]):
+            st.markdown(f"- Net Cluster {int(net_cluster)}: {format_roi_with_color(roi_data[col_name].iloc[0])}",
+                        unsafe_allow_html=True)
+            cluster_shown = True
 
-    # Serve cluster
+    # Serve cluster - FIXED: Now properly checking if column exists and has value
     if not pd.isna(serve_cluster):
         col_name = f'roi_vs_serve{int(serve_cluster)}_match'
-        if col_name in roi_data.columns:
-            roi_value = roi_data[col_name].iloc[0]
-            if not pd.isna(roi_value):
-                cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: {format_roi_with_color(roi_value)}")
-                total_cluster_roi += roi_value
-                valid_clusters += 1
-            else:
-                cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: No data")
-        else:
-            cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: Column missing")
-    else:
-        cluster_display.append("- Serve Cluster: Not available")
+        if col_name in roi_data.columns and not pd.isna(roi_data[col_name].iloc[0]):
+            st.markdown(f"- Serve Cluster {int(serve_cluster)}: {format_roi_with_color(roi_data[col_name].iloc[0])}",
+                        unsafe_allow_html=True)
+            cluster_shown = True
 
-    # Display all cluster information
-    for line in cluster_display:
-        st.markdown(line, unsafe_allow_html=True)
+    if not cluster_shown:
+        st.markdown("- No cluster data available")
 
-    # Display total cluster ROI if we have any valid clusters
-    if valid_clusters > 0:
-        st.markdown(f"**Total Cluster ROI:** {format_roi_with_color(total_cluster_roi)}",
+    # Display total cluster ROI with color and 2 decimal places
+    if cluster_sum != "N/A":
+        st.markdown(f"**Total Cluster ROI:** {format_roi_with_color(round(cluster_sum, 2))}",
                     unsafe_allow_html=True)
     else:
-        st.markdown("**Total Cluster ROI:** No valid cluster data available")
-
-def render_head_to_head(h2h_df, player1, player2):
-    if h2h_df.empty:
-        st.info("No previous matches found between these players.")
-        return
-
-    # Calculate statistics
-    player1_wins = h2h_df[h2h_df['winner'] == player1].shape[0]
-    player2_wins = h2h_df[h2h_df['winner'] == player2].shape[0]
-    total_matches = len(h2h_df)
-
-    # Display stats
-    col1, col2, col3 = st.columns(3)
-    col1.metric(f"{player1} Wins", player1_wins, f"{player1_wins/total_matches*100:.1f}%")
-    col2.metric(f"{player2} Wins", player2_wins, f"{player2_wins/total_matches*100:.1f}%")
-    col3.metric("Total Matches", total_matches)
-
-    # Format the table
-    h2h_df['Date'] = pd.to_datetime(h2h_df['match_date']).dt.strftime('%Y-%m-%d')
-    display_df = h2h_df[['Date', 'tournament_name', 'surface', 'winner', 'loser', 'score', 'winner_odds', 'loser_odds']]
-    display_df.columns = ['Date', 'Tournament', 'Surface', 'Winner', 'Loser', 'Score', 'Win Odds', 'Lose Odds']
-
-    # Style the DataFrame
-    def style_h2h_row(row):
-        if row['Winner'] == player1:
-            return ['background-color: #d4edda; color: black'] * len(row)
-        else:
-            return ['background-color: #f8d7da; color: black'] * len(row)
-
-    styled_df = display_df.style.apply(style_h2h_row, axis=1)
-    st.dataframe(styled_df)
+        st.markdown("**Total Cluster ROI:** N/A")
 
 def player_view(player_name, player_history, player_roi, surface, is_left_handed_opponent, opponent_clusters):
     st.subheader(player_name)
@@ -544,12 +440,12 @@ def main():
     date_options = ["Today", "Tomorrow", "Next 3 Days", "All Upcoming"]
     date_filter = st.sidebar.selectbox("Date Range", date_options, index=0)
 
-    # Tournament round filter
-    all_rounds = bets_df['tournament_round'].unique().tolist()
-    selected_rounds = st.sidebar.multiselect(
+    # Tournament tier filter
+    all_tiers = bets_df['tournament_round'].unique().tolist()
+    selected_tiers = st.sidebar.multiselect(
         "Tournament Rounds",
-        options=all_rounds,
-        default=all_rounds
+        options=all_tiers,
+        default=all_tiers
     )
 
     # Surface filter
@@ -575,15 +471,12 @@ def main():
         filtered_bets = bets_df.copy()
 
     # Apply additional filters
-    filtered_bets = filtered_bets[filtered_bets['tournament_round'].isin(selected_rounds)]
+    filtered_bets = filtered_bets[filtered_bets['tournament_round'].isin(selected_tiers)]
     filtered_bets = filtered_bets[filtered_bets['surface'].isin(selected_surfaces)]
 
     # Apply cluster filter if enabled
     if show_cluster_matches:
         filtered_bets = filtered_bets.dropna(subset=['p1_rally_cluster', 'p2_rally_cluster'])
-
-    # Order by match_start_at ascending
-    filtered_bets = filtered_bets.sort_values('match_start_at')
 
     # Display matches
     st.title("🎾 Tennis Betting Assistant")
@@ -594,7 +487,7 @@ def main():
     # Create formatted display
     display_df = filtered_bets.copy()
     display_df['Date'] = pd.to_datetime(display_df['match_start_at']).dt.strftime('%Y-%m-%d %H:%M')
-    display_df['Diff'] = display_df['diff'].apply(lambda x: f"{x:.2f}↑" if x > 0 else f"{abs(x):.2f}↓" if x < 0 else "0.00")
+    display_df['Diff'] = display_df['diff'].apply(format_diff)
 
     # Display matches in a table
     for _, row in display_df.iterrows():
@@ -607,31 +500,29 @@ def main():
         p2_clusters = (row['p2_rally_cluster'], row['p2_net_cluster'], row['p2_serve_cluster'])
 
         # Calculate cluster ROIs with 2 decimal places
-        p1_cluster_roi = calculate_cluster_roi(p1_roi, p2_clusters)
-        p2_cluster_roi = calculate_cluster_roi(p2_roi, p1_clusters)
-
-        # Format for display
-        p1_cluster_display = f"{p1_cluster_roi:.2f}%" if isinstance(p1_cluster_roi, (int, float)) else p1_cluster_roi
-        p2_cluster_display = f"{p2_cluster_roi:.2f}%" if isinstance(p2_cluster_roi, (int, float)) else p2_cluster_roi
+        p1_cluster_roi = round(float(calculate_cluster_roi(p1_roi, p2_clusters)), 2) if calculate_cluster_roi(p1_roi, p2_clusters) != "N/A" else "N/A"
+        p2_cluster_roi = round(float(calculate_cluster_roi(p2_roi, p1_clusters)), 2) if calculate_cluster_roi(p2_roi, p1_clusters) != "N/A" else "N/A"
 
         # Create columns for match display
-        cols = st.columns([0.8, 1.5, 1.2, 2, 1, 1, 1, 1, 1, 1, 1, 1])
+        cols = st.columns([0.8, 1.2, 1.5, 2, 1, 1, 1, 1, 1, 1, 1, 1])
         cols[0].write(f"**{row['tour']}**")
         cols[1].write(f"**{row['Date']}**")
         cols[2].write(f"**{row['tournament_round']}**")
         cols[3].write(f"**{row['p1_name']}** vs **{row['p2_name']}**")
         cols[4].write(f"{row['surface']}")
 
-        # Player 1 odds and ROI
+        # Player 1 odds and ROI (formatted to 2 decimal places)
         cols[5].write(f"P1 P: {row['p1_pinnacle_odds']:.2f}")
         cols[6].write(f"P1 M: {row['p1_model_odds']:.2f}")
-        cols[7].write(f"P1 ROI: {p1_cluster_display}")
+        cols[7].write(f"P1 ROI: {p1_cluster_roi if isinstance(p1_cluster_roi, str) else f'{p1_cluster_roi:.2f}%'}")
 
-        # Player 2 odds and ROI
+        # Player 2 odds and ROI (formatted to 2 decimal places)
         cols[8].write(f"P2 P: {row['p2_pinnacle_odds']:.2f}")
         cols[9].write(f"P2 M: {row['p2_model_odds']:.2f}")
-        cols[10].write(f"P2 ROI: {p2_cluster_display}")
-        cols[11].write(row['Diff'])
+        cols[10].write(f"P2 ROI: {p2_cluster_roi if isinstance(p2_cluster_roi, str) else f'{p2_cluster_roi:.2f}%'}")
+
+        # Diff column
+        cols[11].write(f"Diff: {row['Diff']}")
 
         if cols[0].button("Analyze", key=f"analyze_{row['p1_name']}_{row['p2_name']}_{row['match_start_at']}"):
             st.session_state.selected_match = row
@@ -655,13 +546,7 @@ def main():
         p1_clusters = (match['p1_rally_cluster'], match['p1_net_cluster'], match['p1_serve_cluster'])
         p2_clusters = (match['p2_rally_cluster'], match['p2_net_cluster'], match['p2_serve_cluster'])
 
-        # Head-to-head section
-        st.subheader("Head-to-Head History")
-        h2h_df = load_head_to_head(client, match['p1_name'], match['p2_name'], match['tour'])
-        render_head_to_head(h2h_df, match['p1_name'], match['p2_name'])
-
         # Player view columns
-        st.subheader("Player Analysis")
         col1, col2 = st.columns(2)
 
         with col1:
