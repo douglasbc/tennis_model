@@ -294,7 +294,7 @@ def update_stats_dataset(days_ago=0):
 # Example usage
 if __name__ == "__main__":
     # To scrape yesterday's matches
-    update_stats_dataset(days_ago=7)
+    update_stats_dataset(days_ago=1)
     
     # To scrape multiple days
     # for days in range(1,6):

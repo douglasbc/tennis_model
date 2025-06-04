@@ -33,12 +33,12 @@ wta_odds as (
   select * from {{ ref('wta_odds') }}
 ),
 
-rounds as (
-  select * from {{ source('raw_layer', 'rounds') }}
+wta_rankings as (
+  select * from {{ ref('wta_rankings') }}
 ),
 
-rankings_wta as (
-  select * from {{ source('raw_layer', 'rankings_wta') }}
+rounds as (
+  select * from {{ source('raw_layer', 'rounds') }}
 ),
 
 wta_serve_dependency_clusters as (
@@ -128,9 +128,9 @@ final as (
 --       left join wta_odds as o on m.match_id = o.match_id
       left join wta_odds as o1 on m.match_id = o1.match_id_1
       left join wta_odds as o2 on m.match_id = o2.match_id_2
-      left join rankings_wta as r1 on m.player_1_id = r1.player_id
+      left join wta_rankings as r1 on m.player_1_id = r1.player_id
         and m.match_date between r1.ranking_date and date_add(r1.ranking_date, interval 6 day)
-      left join rankings_wta as r2 on m.player_2_id = r2.player_id
+      left join wta_rankings as r2 on m.player_2_id = r2.player_id
         and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
       left join rounds as r on m.round_id = r.round_id
       left join wta_serve_dependency_clusters as cs1 on p1.player_name = cs1.player_name

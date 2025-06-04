@@ -33,6 +33,10 @@ atp_odds as (
   select * from {{ ref('atp_odds') }}
 ),
 
+atp_rankings as (
+  select * from {{ ref('atp_rankings') }}
+),
+
 rounds as (
   select * from {{ source('raw_layer', 'rounds') }}
 ),
@@ -128,9 +132,9 @@ final as (
 --       left join atp_odds as o on m.match_id = o.match_id
       left join atp_odds as o1 on m.match_id = o1.match_id_1
       left join atp_odds as o2 on m.match_id = o2.match_id_2
-      left join rankings_atp as r1 on m.player_1_id = r1.player_id
+      left join atp_rankings as r1 on m.player_1_id = r1.player_id
         and m.match_date between r1.ranking_date and date_add(r1.ranking_date, interval 6 day)
-      left join rankings_atp as r2 on m.player_2_id = r2.player_id
+      left join atp_rankings as r2 on m.player_2_id = r2.player_id
         and m.match_date between r2.ranking_date and date_add(r2.ranking_date, interval 6 day)
       left join rounds as r on m.round_id = r.round_id
       left join atp_serve_dependency_clusters as cs1 on p1.player_name = cs1.player_name
