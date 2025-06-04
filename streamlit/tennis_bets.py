@@ -98,9 +98,9 @@ def load_player_roi(_client):
             required_cols = ['player_name', 'tour', 'overall_match_win_roi',
                            'hard_match_win_roi', 'clay_match_win_roi', 'grass_match_win_roi',
                            'indoor_hard_match_win_roi', 'vs_left_handed_match_roi',
-                           'roi_vs_rally1_match', 'roi_vs_rally2_match', 'roi_vs_rally3_match',
-                           'roi_vs_net1_match', 'roi_vs_net2_match', 'roi_vs_net3_match',
-                           'roi_vs_serve1_match', 'roi_vs_serve2_match', 'roi_vs_serve3_match']
+                           'roi_vs_rally1_match', 'roi_vs_rally2_match', 'roi_vs_rally3_match', 'roi_vs_rally4_match',
+                           'roi_vs_net1_match', 'roi_vs_net2_match', 'roi_vs_net3_match', 'roi_vs_net4_match'
+                           'roi_vs_serve1_match', 'roi_vs_serve2_match', 'roi_vs_serve3_match', 'roi_vs_serve4_match', 'roi_vs_serve5_match']
             if all(col in cached.columns for col in required_cols):
                 return cached
 
