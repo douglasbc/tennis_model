@@ -1,7 +1,6 @@
 # Project folders
 config/
 data/
-data_collection/
 
 # Odds data
 odds_api/tennis_odds.json
