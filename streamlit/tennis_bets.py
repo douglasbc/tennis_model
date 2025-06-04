@@ -180,6 +180,10 @@ def load_head_to_head(_client, player1, player2, tour):
         if datetime.now() - cache_time < timedelta(hours=24):
             return pd.read_parquet(cache_file)
 
+    # Escape single quotes in player names
+    player1_escaped = player1.replace("'", "\\'")
+    player2_escaped = player2.replace("'", "\\'")
+    
     # Query BigQuery if cache is stale or missing
     query = f"""
     SELECT 
@@ -197,12 +201,17 @@ def load_head_to_head(_client, player1, player2, tour):
         p2_win_match_odds AS loser_odds
     FROM `tennis-358702.analytics.streamlit_matches`
     WHERE 
-        ((p1_name = '{player1}' AND p2_name = '{player2}')
-        OR (p1_name = '{player2}' AND p2_name = '{player1}'))
+        ((p1_name = '{player1_escaped}' AND p2_name = '{player2_escaped}')
+        OR (p1_name = '{player2_escaped}' AND p2_name = '{player1_escaped}'))
         AND tour = '{tour}'
     ORDER BY match_date DESC
     """
-    df = _client.query(query).to_dataframe()
+    
+    try:
+        df = _client.query(query).to_dataframe()
+    except Exception as e:
+        st.error(f"Error querying head-to-head data: {e}")
+        return pd.DataFrame()
 
     # Save to cache
     df.to_parquet(cache_file)
@@ -502,8 +511,8 @@ def render_player_roi(roi_data, player_name, surface, is_left_handed_opponent, o
     st.markdown(f"**{surface} ROI:** {format_roi_with_color(roi_data[surface_col].iloc[0])}",
                 unsafe_allow_html=True)
 
-    # Left-handed ROI if applicable
-    if is_left_handed_opponent:
+    # Check if left-handed status is available and True
+    if not pd.isna(is_left_handed_opponent) and is_left_handed_opponent:
         st.markdown(f"**vs Left-Handed ROI:** {format_roi_with_color(roi_data['vs_left_handed_match_roi'].iloc[0])}",
                     unsafe_allow_html=True)
 

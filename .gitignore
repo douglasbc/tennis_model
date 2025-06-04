@@ -1,9 +1,8 @@
 # Project folders
 config/
 data/
-
-# Odds data
-odds_api/tennis_odds.json
+tennis_data_cache/
+odds_api/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
