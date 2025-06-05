@@ -98,9 +98,9 @@ def load_player_roi(_client):
             required_cols = ['player_name', 'tour', 'overall_match_win_roi',
                            'hard_match_win_roi', 'clay_match_win_roi', 'grass_match_win_roi',
                            'indoor_hard_match_win_roi', 'vs_left_handed_match_roi',
-                           'roi_vs_rally1_match', 'roi_vs_rally2_match', 'roi_vs_rally3_match',
-                           'roi_vs_net1_match', 'roi_vs_net2_match', 'roi_vs_net3_match',
-                           'roi_vs_serve1_match', 'roi_vs_serve2_match', 'roi_vs_serve3_match']
+                           'roi_vs_rally1_match', 'roi_vs_rally2_match', 'roi_vs_rally3_match', 'roi_vs_rally4_match',
+                           'roi_vs_net1_match', 'roi_vs_net2_match', 'roi_vs_net3_match', 'roi_vs_net4_match'
+                           'roi_vs_serve1_match', 'roi_vs_serve2_match', 'roi_vs_serve3_match', 'roi_vs_serve4_match', 'roi_vs_serve5_match']
             if all(col in cached.columns for col in required_cols):
                 return cached
 
@@ -180,6 +180,10 @@ def load_head_to_head(_client, player1, player2, tour):
         if datetime.now() - cache_time < timedelta(hours=24):
             return pd.read_parquet(cache_file)
 
+    # Escape single quotes in player names
+    player1_escaped = player1.replace("'", "\\'")
+    player2_escaped = player2.replace("'", "\\'")
+    
     # Query BigQuery if cache is stale or missing
     query = f"""
     SELECT 
@@ -197,12 +201,17 @@ def load_head_to_head(_client, player1, player2, tour):
         p2_win_match_odds AS loser_odds
     FROM `tennis-358702.analytics.streamlit_matches`
     WHERE 
-        ((p1_name = '{player1}' AND p2_name = '{player2}')
-        OR (p1_name = '{player2}' AND p2_name = '{player1}'))
+        ((p1_name = '{player1_escaped}' AND p2_name = '{player2_escaped}')
+        OR (p1_name = '{player2_escaped}' AND p2_name = '{player1_escaped}'))
         AND tour = '{tour}'
     ORDER BY match_date DESC
     """
-    df = _client.query(query).to_dataframe()
+    
+    try:
+        df = _client.query(query).to_dataframe()
+    except Exception as e:
+        st.error(f"Error querying head-to-head data: {e}")
+        return pd.DataFrame()
 
     # Save to cache
     df.to_parquet(cache_file)
@@ -337,19 +346,29 @@ def render_player_history(history, player_name):
     if selected_surfaces:
         filtered = filtered[filtered['surface'].isin(selected_surfaces)]
 
-    # Create dynamic columns
+    # Create dynamic columns - ALWAYS show winner's odds as Odds 1
     filtered['Player1'] = np.where(filtered['win'] == 1, filtered['player_name'], filtered['opponent'])
     filtered['Player2'] = np.where(filtered['win'] == 1, filtered['opponent'], filtered['player_name'])
     filtered['R1'] = np.where(filtered['win'] == 1, filtered['player_ranking'], filtered['opponent_ranking'])
     filtered['R2'] = np.where(filtered['win'] == 1, filtered['opponent_ranking'], filtered['player_ranking'])
-    filtered['Odds1'] = np.where(filtered['win'] == 1, filtered['p1_win_match_odds'], filtered['p2_win_match_odds'])
-    filtered['Odds2'] = np.where(filtered['win'] == 1, filtered['p2_win_match_odds'], filtered['p1_win_match_odds'])
+
+    # ALWAYS show winner's odds as Odds 1
+    filtered['Odds1'] = np.where(filtered['win'] == 1,
+                                filtered['p1_win_match_odds'],
+                                filtered['p2_win_match_odds'])
+
+    # ALWAYS show loser's odds as Odds 2
+    filtered['Odds2'] = np.where(filtered['win'] == 1,
+                                filtered['p2_win_match_odds'],
+                                filtered['p1_win_match_odds'])
 
     # Format columns
     filtered['R1'] = filtered['R1'].astype('Int64').astype(str).replace('<NA>', '')
     filtered['R2'] = filtered['R2'].astype('Int64').astype(str).replace('<NA>', '')
-    filtered['Odds1'] = filtered['Odds1'].round(2)
-    filtered['Odds2'] = filtered['Odds2'].round(2)
+
+    # Format odds to 2 decimal places without extra zeros
+    filtered['Odds1'] = filtered['Odds1'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+    filtered['Odds2'] = filtered['Odds2'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
 
     # Format columns - keep all original columns but only show relevant ones
     display_cols = [
@@ -397,10 +416,10 @@ def render_player_history(history, player_name):
                 styles[player2_idx] = 'background-color: white; color: black'
                 styles[r2_idx] = 'background-color: white; color: black'
             else:  # Player lost
-                styles[player2_idx] = 'background-color: #f8d7da; color: black'  # Light red
-                styles[r2_idx] = 'background-color: #f8d7da; color: black'        # Light red
                 styles[player1_idx] = 'background-color: white; color: black'
                 styles[r1_idx] = 'background-color: white; color: black'
+                styles[player2_idx] = 'background-color: #f8d7da; color: black'  # Light red
+                styles[r2_idx] = 'background-color: #f8d7da; color: black'        # Light red
 
             # Surface coloring
             surface_colors = {
@@ -492,21 +511,21 @@ def render_player_roi(roi_data, player_name, surface, is_left_handed_opponent, o
     st.markdown(f"**{surface} ROI:** {format_roi_with_color(roi_data[surface_col].iloc[0])}",
                 unsafe_allow_html=True)
 
-    # Left-handed ROI if applicable
-    if is_left_handed_opponent:
+    # Check if left-handed status is available and True
+    if not pd.isna(is_left_handed_opponent) and is_left_handed_opponent:
         st.markdown(f"**vs Left-Handed ROI:** {format_roi_with_color(roi_data['vs_left_handed_match_roi'].iloc[0])}",
                     unsafe_allow_html=True)
 
     # Cluster ROIs section
     st.markdown("**Cluster ROIs vs Opponent:**", unsafe_allow_html=True)
-
+    
     rally_cluster, net_cluster, serve_cluster = opponent_clusters
     total_cluster_roi = 0
     valid_clusters = 0
-
+    
     # Always show all 3 cluster types, even if some are missing
     cluster_display = []
-
+    
     # Rally cluster
     if not pd.isna(rally_cluster):
         col_name = f'roi_vs_rally{int(rally_cluster)}_match'
@@ -587,32 +606,41 @@ def render_head_to_head(h2h_df, player1, player2):
     h2h_df['Player 2'] = h2h_df['loser']
     h2h_df['R1'] = h2h_df['winner_ranking'].astype('Int64').astype(str).replace('<NA>', '')
     h2h_df['R2'] = h2h_df['loser_ranking'].astype('Int64').astype(str).replace('<NA>', '')
-    h2h_df['Odds 1'] = h2h_df['winner_odds'].round(2)
-    h2h_df['Odds 2'] = h2h_df['loser_odds'].round(2)
+
+    # Format odds to 2 decimal places without extra zeros
+    h2h_df['Odds 1'] = h2h_df['winner_odds'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+    h2h_df['Odds 2'] = h2h_df['loser_odds'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
+
     h2h_df['Date'] = pd.to_datetime(h2h_df['match_date']).dt.strftime('%Y-%m-%d')
 
-    # Reorder columns
-    display_df = h2h_df[['Player 1', 'R1', 'Player 2', 'R2', 'tournament_name', 'Date',
-                         'round', 'surface', 'score', 'Odds 1', 'Odds 2']]
-    display_df.columns = ['Player 1', 'R1', 'Player 2', 'R2', 'Tournament', 'Date',
-                          'Round', 'Surface', 'Score', 'Odds 1', 'Odds 2']
+    # Reorder columns - Level at the end
+    display_df = h2h_df[['Player 1', 'R1', 'Player 2', 'R2', 'tournament_name',
+                         'Date', 'round', 'surface', 'score', 'Odds 1', 'Odds 2', 'tournament_level']]
+    display_df.columns = ['Player 1', 'R1', 'Player 2', 'R2', 'Tournament',
+                          'Date', 'Round', 'Surface', 'Score', 'Odds 1', 'Odds 2', 'Level']
 
     # Style the DataFrame
     def style_h2h_row(row):
         # Initialize all styles to white background, black text
         styles = ['background-color: white; color: black'] * len(row)
 
-        # Color Player 1 (winner) green
+        # Get indices of player columns
         player1_idx = list(row.index).index('Player 1')
-        r1_idx = list(row.index).index('R1')
-        styles[player1_idx] = 'background-color: #d4edda; color: black'  # Light green
-        styles[r1_idx] = 'background-color: #d4edda; color: black'      # Light green
-
-        # Color Player 2 (loser) red
         player2_idx = list(row.index).index('Player 2')
+        r1_idx = list(row.index).index('R1')
         r2_idx = list(row.index).index('R2')
-        styles[player2_idx] = 'background-color: #f8d7da; color: black'  # Light red
-        styles[r2_idx] = 'background-color: #f8d7da; color: black'      # Light red
+
+        # Apply coloring based on player1 (the first player in comparison)
+        if row['Player 1'] == player1:  # Player1 won the match
+            styles[player1_idx] = 'background-color: #d4edda; color: black'  # Light green
+            styles[r1_idx] = 'background-color: #d4edda; color: black'      # Light green
+            styles[player2_idx] = 'background-color: white; color: black'
+            styles[r2_idx] = 'background-color: white; color: black'
+        else:  # Player1 lost the match (so Player 2 is the focus player)
+            styles[player1_idx] = 'background-color: white; color: black'
+            styles[r1_idx] = 'background-color: white; color: black'
+            styles[player2_idx] = 'background-color: #f8d7da; color: black'  # Light red
+            styles[r2_idx] = 'background-color: #f8d7da; color: black'      # Light red
 
         # Tournament level coloring
         tournament_level_colors = {
@@ -657,8 +685,9 @@ def render_head_to_head(h2h_df, player1, player2):
 
         # Apply tournament level color
         tournament_idx = list(row.index).index('Tournament')
-        # Since we don't have tournament_level in display, we skip this coloring
-        # If you want to add it, you'll need to include it in the DataFrame
+        level = row['Level']
+        if level in tournament_level_colors:
+            styles[tournament_idx] = f'background-color: {tournament_level_colors[level]}; color: black'
 
         # Apply round color
         round_idx = list(row.index).index('Round')
@@ -670,6 +699,10 @@ def render_head_to_head(h2h_df, player1, player2):
         surface_idx = list(row.index).index('Surface')
         if row['Surface'] in surface_colors:
             styles[surface_idx] = f'background-color: {surface_colors[row["Surface"]]}; color: black'
+
+        # Hide Level column by making width 0
+        level_idx = list(row.index).index('Level')
+        styles[level_idx] = 'width: 0px; padding: 0px; margin: 0px; border: 0px;'
 
         return styles
 
@@ -750,10 +783,25 @@ def main():
     # Display match count
     st.subheader(f"Upcoming Matches ({len(filtered_bets)})")
 
+    def format_diff(value):
+        try:
+            # Handle both float and string representations
+            if isinstance(value, str):
+                value = float(value.replace('↑', '').replace('↓', ''))
+
+            if value > 0:
+                return f"<span style='color:green'>{value:.2f}↑</span>"
+            elif value < 0:
+                return f"<span style='color:red'>{abs(value):.2f}↓</span>"
+            else:
+                return "0.00"
+        except (ValueError, TypeError):
+            return str(value)
+
     # Create formatted display
     display_df = filtered_bets.copy()
     display_df['Date'] = pd.to_datetime(display_df['match_start_at']).dt.strftime('%Y-%m-%d %H:%M')
-    display_df['Diff'] = display_df['diff'].apply(lambda x: f"{x:.2f}↑" if x > 0 else f"{abs(x):.2f}↓" if x < 0 else "0.00")
+    # display_df['Diff'] = display_df['diff'].apply(lambda x: f"{x:.2f}↑" if x > 0 else f"{abs(x):.2f}↓" if x < 0 else "0.00")
 
     # Display matches in a table
     for _, row in display_df.iterrows():
@@ -781,6 +829,11 @@ def main():
         cols[3].write(f"**{row['p1_name']}** vs **{row['p2_name']}**")
         cols[4].write(f"{row['surface']}")
 
+        # Format Diff column
+        diff_value = row['diff']
+        diff_display = format_diff(diff_value)
+        cols[5].markdown(diff_display, unsafe_allow_html=True)
+
         # Helper function to format value and determine color
         def format_value_with_color(value):
             try:
@@ -802,8 +855,8 @@ def main():
                 return str(value), "black"
 
         # Format Diff column (convert to percentage)
-        diff_value, diff_color = format_value_with_color(row['Diff'])
-        cols[5].markdown(f"<span style='color:{diff_color}'>{diff_value}</span>", unsafe_allow_html=True)
+        # diff_value, diff_color = format_value_with_color(row['Diff'])
+        # cols[5].markdown(f"<span style='color:{diff_color}'>{diff_value}</span>", unsafe_allow_html=True)
 
         # Player 1 odds and ROI
         cols[6].write(f"P1 P: {row['p1_pinnacle_odds']:.2f}")
@@ -865,44 +918,44 @@ def main():
                 match['surface'], match['p1_is_left_handed'], p1_clusters
             )
 
-        # Value analysis
-        st.subheader("Value Analysis")
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if not p1_roi.empty:
-                model_prob = 1 / match['p1_model_odds']
-                implied_prob = 1 / match['p1_pinnacle_odds']
-                value = model_prob - implied_prob
-                st.metric(f"{match['p1_name']} Value",
-                         f"{value*100:.1f}%",
-                         delta="Positive Value" if value > 0 else "Negative Value",
-                         delta_color="normal")
-
-        with col2:
-            if not p2_roi.empty:
-                model_prob = 1 / match['p2_model_odds']
-                implied_prob = 1 / match['p2_pinnacle_odds']
-                value = model_prob - implied_prob
-                st.metric(f"{match['p2_name']} Value",
-                         f"{value*100:.1f}%",
-                         delta="Positive Value" if value > 0 else "Negative Value",
-                         delta_color="normal")
-
-        # Bet recommendation
-        st.subheader("Betting Recommendation")
-        if not p1_roi.empty and not p2_roi.empty:
-            p1_value = (1 / match['p1_model_odds'] - 1/match['p1_pinnacle_odds']) * 100
-            p2_value = (1 / match['p2_model_odds'] - 1/match['p2_pinnacle_odds']) * 100
-
-            if p1_value > 0 and p1_value > p2_value:
-                st.success(f"✅ Recommended Bet: **{match['p1_name']}** (Value: {p1_value:.1f}%)")
-            elif p2_value > 0 and p2_value > p1_value:
-                st.success(f"✅ Recommended Bet: **{match['p2_name']}** (Value: {p2_value:.1f}%)")
-            else:
-                st.warning("⚠️ No Clear Value Bet - Both players show negative or neutral value")
-        else:
-            st.info("Insufficient data for betting recommendation")
+        # # Value analysis
+        # st.subheader("Value Analysis")
+        # col1, col2 = st.columns(2)
+        #
+        # with col1:
+        #     if not p1_roi.empty:
+        #         model_prob = 1 / match['p1_model_odds']
+        #         implied_prob = 1 / match['p1_pinnacle_odds']
+        #         value = model_prob - implied_prob
+        #         st.metric(f"{match['p1_name']} Value",
+        #                  f"{value*100:.1f}%",
+        #                  delta="Positive Value" if value > 0 else "Negative Value",
+        #                  delta_color="normal")
+        #
+        # with col2:
+        #     if not p2_roi.empty:
+        #         model_prob = 1 / match['p2_model_odds']
+        #         implied_prob = 1 / match['p2_pinnacle_odds']
+        #         value = model_prob - implied_prob
+        #         st.metric(f"{match['p2_name']} Value",
+        #                  f"{value*100:.1f}%",
+        #                  delta="Positive Value" if value > 0 else "Negative Value",
+        #                  delta_color="normal")
+        #
+        # # Bet recommendation
+        # st.subheader("Betting Recommendation")
+        # if not p1_roi.empty and not p2_roi.empty:
+        #     p1_value = (1 / match['p1_model_odds'] - 1/match['p1_pinnacle_odds']) * 100
+        #     p2_value = (1 / match['p2_model_odds'] - 1/match['p2_pinnacle_odds']) * 100
+        #
+        #     if p1_value > 0 and p1_value > p2_value:
+        #         st.success(f"✅ Recommended Bet: **{match['p1_name']}** (Value: {p1_value:.1f}%)")
+        #     elif p2_value > 0 and p2_value > p1_value:
+        #         st.success(f"✅ Recommended Bet: **{match['p2_name']}** (Value: {p2_value:.1f}%)")
+        #     else:
+        #         st.warning("⚠️ No Clear Value Bet - Both players show negative or neutral value")
+        # else:
+        #     st.info("Insufficient data for betting recommendation")
 
         if st.button("← Back to Matches"):
             del st.session_state.selected_match
