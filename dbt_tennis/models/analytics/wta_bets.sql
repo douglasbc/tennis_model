@@ -114,6 +114,7 @@ base_matches as (
   select
     po.event_id,
     po.tournament_round,
+    ap.tournament_name,
     ap.tournament_tier,
     ap.surface,
     datetime_sub(po.match_start_at, interval 3 hour) as match_start_at,
@@ -300,4 +301,4 @@ select
   round(p2_home_roi, 2) as p2_home_roi
 
 from roi_enhancements
-where tournament_tier <> 'Future' and tournament_tier not like 'ITF Women Santo Domingo%'
+where left(tournament_name, 3) <> 'W15'

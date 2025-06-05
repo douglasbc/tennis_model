@@ -22,8 +22,8 @@ atp_matches as (
         'ATP' as tour, match_date, tournament_name, tournament_tier, tournament_level, round, surface, p1_name, p2_name, result as score, p1_win_match_odds, p2_win_match_odds, p1_ranking, p2_ranking
     from {{ ref('atp_matches') }}
     where
-        p1_name in (select * from atp_bets_players)
-       or p2_name in (select * from atp_bets_players)
+        (p1_name in (select * from atp_bets_players)
+       or p2_name in (select * from atp_bets_players))
       and match_date >= '2022-12-28'
         ),
 
@@ -32,8 +32,8 @@ wta_matches as (
         'WTA' as tour, match_date, tournament_name, tournament_tier, tournament_level, round, surface, p1_name, p2_name, result as score, p1_win_match_odds, p2_win_match_odds, p1_ranking, p2_ranking
     from {{ ref('wta_matches') }}
     where
-        p1_name in (select * from wta_bets_players)
-       or p2_name in (select * from wta_bets_players)
+        (p1_name in (select * from wta_bets_players)
+       or p2_name in (select * from wta_bets_players))
       and match_date >= '2022-12-28'
         )
 
