@@ -24,7 +24,7 @@ atp_matches as (
     where
         (p1_name in (select * from atp_bets_players)
        or p2_name in (select * from atp_bets_players))
-      and match_date >= '2022-12-28'
+      and match_date >= '2019-12-27'
         ),
 
 wta_matches as (
@@ -34,7 +34,7 @@ wta_matches as (
     where
         (p1_name in (select * from wta_bets_players)
        or p2_name in (select * from wta_bets_players))
-      and match_date >= '2022-12-28'
+      and match_date >= '2019-12-27'
         )
 
 select * from atp_matches
