@@ -78,34 +78,30 @@ match_data as (
     from atp_matches
 ),
 
+-- NEW DEDICATED HANDICAP CALCULATION CTE
+handicap_calculations as (
+    select
+        *,
+        -- Calculate handicap outcome and profit
+        case
+            when (games_won + handicap_line) > games_against then handicap_odds - 1  -- Win
+            when (games_won + handicap_line) < games_against then -1                 -- Loss
+            else 0                                                                   -- Push (draw)
+        end as handicap_profit,
+        case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
+        case when player_country = tournament_country then 1 else 0 end as is_home_country
+    from match_data
+    where 
+        handicap_line is not null 
+        and handicap_odds is not null
+),
+
 bet_calculations as (
     select
         *,
         -- Match win ROI calculation
         (is_win * match_win_odds) - 1 as match_win_profit,
-
-        -- PLUS handicap calculation (receiving extra games)
-        case
-            when handicap_line > 0 and handicap_odds is not null then
-                case
-                    when (games_won + handicap_line) > games_against then handicap_odds - 1
-                    when (games_won + handicap_line) = games_against then 0
-                    else -1
-                end
-            else null  -- Explicit null when not a valid plus handicap
-        end as plus_handicap_profit,
-
-        -- MINUS handicap calculation (giving away games)
-        case
-            when handicap_line < 0 and handicap_odds is not null then
-                case
-                    when (games_won + handicap_line) > games_against then handicap_odds - 1
-                    when (games_won + handicap_line) = games_against then 0
-                    else -1
-                end
-            else null  -- Explicit null when not a valid minus handicap
-        end as minus_handicap_profit,
-
+        
         -- Flags for special conditions
         case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
         case when player_country = tournament_country then 1 else 0 end as is_home_country
@@ -128,7 +124,8 @@ match_win_bets as (
     where match_win_odds is not null
 ),
 
-plus_handicap_bets as (
+-- HANDICAP BETS FROM DEDICATED CTE
+handicap_bets as (
     select
         player_name,
         opponent_is_left_handed,
@@ -138,24 +135,9 @@ plus_handicap_bets as (
         opponent_rally_cluster,
         opponent_net_cluster,
         opponent_serve_cluster,
-        plus_handicap_profit as profit
-    from bet_calculations
-    where handicap_line > 0 and handicap_odds is not null
-),
-
-minus_handicap_bets as (
-    select
-        player_name,
-        opponent_is_left_handed,
-        surface,
-        is_grand_slam,
-        is_home_country,
-        opponent_rally_cluster,
-        opponent_net_cluster,
-        opponent_serve_cluster,
-        minus_handicap_profit as profit
-    from bet_calculations
-    where handicap_line < 0 and handicap_odds is not null
+        handicap_line,
+        handicap_profit as profit
+    from handicap_calculations
 ),
 
 -- ROI CALCULATION FOR OVERALL, SURFACE, AND SPECIAL CONDITIONS
@@ -195,9 +177,12 @@ roi_calculator as (
     from (
         select *, 'match_win' as bet_type from match_win_bets
         union all
-        select *, 'plus_handicap' as bet_type from plus_handicap_bets
-        union all
-        select *, 'minus_handicap' as bet_type from minus_handicap_bets
+        select * except(handicap_line),
+            case 
+                when handicap_line > 0 then 'plus_handicap' 
+                when handicap_line < 0 then 'minus_handicap' 
+            end as bet_type 
+        from handicap_bets
     )
     group by player_name, bet_type
 ),
@@ -230,19 +215,11 @@ cluster_roi_calculator as (
             opponent_net_cluster,
             opponent_serve_cluster,
             profit,
-            'plus_handicap' as bet_type
-        from plus_handicap_bets
-
-        union all
-
-        select
-            player_name,
-            opponent_rally_cluster,
-            opponent_net_cluster,
-            opponent_serve_cluster,
-            profit,
-            'minus_handicap' as bet_type
-        from minus_handicap_bets
+            case 
+                when handicap_line > 0 then 'plus_handicap' 
+                when handicap_line < 0 then 'minus_handicap' 
+            end as bet_type
+        from handicap_bets
     )
     group by player_name, bet_type, opponent_rally_cluster, opponent_net_cluster, opponent_serve_cluster
 ),

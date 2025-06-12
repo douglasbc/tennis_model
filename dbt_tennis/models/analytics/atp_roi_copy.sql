@@ -9,12 +9,12 @@
     )
 }}
 
-with wta_matches as (
+with atp_matches as (
     select *
-    from {{ ref('wta_matches') }}
+    from {{ ref('atp_matches') }}
     where
         regexp_extract(result, r'([a-zA-Z]+)') is null
-        and tournament_tier not in ('Laver Cup', 'Next Gen wta Finals')
+        and tournament_tier not in ('Laver Cup', 'Next Gen ATP Finals')
         and match_date >= '2021-01-01'
         and p1_win_match_odds is not null
         and p2_win_match_odds is not null
@@ -46,7 +46,7 @@ match_data as (
         p1_handicap_odds as handicap_odds,
         p1_total_games as games_won,
         p2_total_games as games_against
-    from wta_matches
+    from atp_matches
 
     union all
 
@@ -75,25 +75,7 @@ match_data as (
         p2_handicap_odds as handicap_odds,
         p2_total_games as games_won,
         p1_total_games as games_against
-    from wta_matches
-),
-
--- NEW DEDICATED HANDICAP CALCULATION CTE
-handicap_calculations as (
-    select
-        *,
-        -- Calculate handicap outcome and profit
-        case
-            when (games_won + handicap_line) > games_against then handicap_odds - 1  -- Win
-            when (games_won + handicap_line) < games_against then -1                 -- Loss
-            else 0                                                                   -- Push (draw)
-        end as handicap_profit,
-        case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
-        case when player_country = tournament_country then 1 else 0 end as is_home_country
-    from match_data
-    where 
-        handicap_line is not null 
-        and handicap_odds is not null
+    from atp_matches
 ),
 
 bet_calculations as (
@@ -101,7 +83,29 @@ bet_calculations as (
         *,
         -- Match win ROI calculation
         (is_win * match_win_odds) - 1 as match_win_profit,
-        
+
+        -- PLUS handicap calculation (receiving extra games)
+        case
+            when handicap_line > 0 and handicap_odds is not null then
+                case
+                    when (games_won + handicap_line) > games_against then handicap_odds - 1
+                    when (games_won + handicap_line) = games_against then 0
+                    else -1
+                end
+            else null  -- Explicit null when not a valid plus handicap
+        end as plus_handicap_profit,
+
+        -- MINUS handicap calculation (giving away games)
+        case
+            when handicap_line < 0 and handicap_odds is not null then
+                case
+                    when (games_won + handicap_line) > games_against then handicap_odds - 1
+                    when (games_won + handicap_line) = games_against then 0
+                    else -1
+                end
+            else null  -- Explicit null when not a valid minus handicap
+        end as minus_handicap_profit,
+
         -- Flags for special conditions
         case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
         case when player_country = tournament_country then 1 else 0 end as is_home_country
@@ -124,8 +128,7 @@ match_win_bets as (
     where match_win_odds is not null
 ),
 
--- HANDICAP BETS FROM DEDICATED CTE
-handicap_bets as (
+plus_handicap_bets as (
     select
         player_name,
         opponent_is_left_handed,
@@ -135,9 +138,24 @@ handicap_bets as (
         opponent_rally_cluster,
         opponent_net_cluster,
         opponent_serve_cluster,
-        handicap_line,
-        handicap_profit as profit
-    from handicap_calculations
+        plus_handicap_profit as profit
+    from bet_calculations
+    where handicap_line > 0 and handicap_odds is not null
+),
+
+minus_handicap_bets as (
+    select
+        player_name,
+        opponent_is_left_handed,
+        surface,
+        is_grand_slam,
+        is_home_country,
+        opponent_rally_cluster,
+        opponent_net_cluster,
+        opponent_serve_cluster,
+        minus_handicap_profit as profit
+    from bet_calculations
+    where handicap_line < 0 and handicap_odds is not null
 ),
 
 -- ROI CALCULATION FOR OVERALL, SURFACE, AND SPECIAL CONDITIONS
@@ -177,12 +195,9 @@ roi_calculator as (
     from (
         select *, 'match_win' as bet_type from match_win_bets
         union all
-        select * except(handicap_line),
-            case 
-                when handicap_line > 0 then 'plus_handicap' 
-                when handicap_line < 0 then 'minus_handicap' 
-            end as bet_type 
-        from handicap_bets
+        select *, 'plus_handicap' as bet_type from plus_handicap_bets
+        union all
+        select *, 'minus_handicap' as bet_type from minus_handicap_bets
     )
     group by player_name, bet_type
 ),
@@ -215,11 +230,19 @@ cluster_roi_calculator as (
             opponent_net_cluster,
             opponent_serve_cluster,
             profit,
-            case 
-                when handicap_line > 0 then 'plus_handicap' 
-                when handicap_line < 0 then 'minus_handicap' 
-            end as bet_type
-        from handicap_bets
+            'plus_handicap' as bet_type
+        from plus_handicap_bets
+
+        union all
+
+        select
+            player_name,
+            opponent_rally_cluster,
+            opponent_net_cluster,
+            opponent_serve_cluster,
+            profit,
+            'minus_handicap' as bet_type
+        from minus_handicap_bets
     )
     group by player_name, bet_type, opponent_rally_cluster, opponent_net_cluster, opponent_serve_cluster
 ),
@@ -299,6 +322,11 @@ cluster_pivot as (
         sum(if(opponent_net_cluster = 3 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 3 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net3_plus_handicap,
         sum(if(opponent_net_cluster = 3 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 3 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net3_minus_handicap,
 
+        -- Cluster 4
+        sum(if(opponent_net_cluster = 4 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 4 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_net4_match,
+        sum(if(opponent_net_cluster = 4 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 4 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net4_plus_handicap,
+        sum(if(opponent_net_cluster = 4 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_net_cluster = 4 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_net4_minus_handicap,
+
         -- Serve Dependency Clusters (1-5)
         -- Cluster 1
         sum(if(opponent_serve_cluster = 1 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 1 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve1_match,
@@ -318,7 +346,12 @@ cluster_pivot as (
         -- Cluster 4
         sum(if(opponent_serve_cluster = 4 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 4 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve4_match,
         sum(if(opponent_serve_cluster = 4 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 4 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve4_plus_handicap,
-        sum(if(opponent_serve_cluster = 4 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 4 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve4_minus_handicap
+        sum(if(opponent_serve_cluster = 4 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 4 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve4_minus_handicap,
+
+        -- Cluster 5
+        sum(if(opponent_serve_cluster = 5 and bet_type = 'match_win', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 5 and bet_type = 'match_win', total_matches, 0)), 0) * 100 as roi_vs_serve5_match,
+        sum(if(opponent_serve_cluster = 5 and bet_type = 'plus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 5 and bet_type = 'plus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve5_plus_handicap,
+        sum(if(opponent_serve_cluster = 5 and bet_type = 'minus_handicap', total_profit, 0)) / nullif(sum(if(opponent_serve_cluster = 5 and bet_type = 'minus_handicap', total_matches, 0)), 0) * 100 as roi_vs_serve5_minus_handicap
     from cluster_roi_calculator
     group by player_name
 ),
@@ -334,10 +367,12 @@ final_roi as (
         c.roi_vs_net1_match, c.roi_vs_net1_plus_handicap, c.roi_vs_net1_minus_handicap,
         c.roi_vs_net2_match, c.roi_vs_net2_plus_handicap, c.roi_vs_net2_minus_handicap,
         c.roi_vs_net3_match, c.roi_vs_net3_plus_handicap, c.roi_vs_net3_minus_handicap,
+        c.roi_vs_net4_match, c.roi_vs_net4_plus_handicap, c.roi_vs_net4_minus_handicap,
         c.roi_vs_serve1_match, c.roi_vs_serve1_plus_handicap, c.roi_vs_serve1_minus_handicap,
         c.roi_vs_serve2_match, c.roi_vs_serve2_plus_handicap, c.roi_vs_serve2_minus_handicap,
         c.roi_vs_serve3_match, c.roi_vs_serve3_plus_handicap, c.roi_vs_serve3_minus_handicap,
-        c.roi_vs_serve4_match, c.roi_vs_serve4_plus_handicap, c.roi_vs_serve4_minus_handicap
+        c.roi_vs_serve4_match, c.roi_vs_serve4_plus_handicap, c.roi_vs_serve4_minus_handicap,
+        c.roi_vs_serve5_match, c.roi_vs_serve5_plus_handicap, c.roi_vs_serve5_minus_handicap
     from pivoted_roi p
     left join cluster_pivot c
     on p.player_name = c.player_name

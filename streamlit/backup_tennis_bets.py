@@ -329,10 +329,10 @@ def render_player_history(history, player_name):
             'Hard': '#1E90FF',    # RGB: 30, 144, 255
             'Indoor Hard': '#87CEEB'  # RGB: 135, 206, 235
         }
-
+        
         # Get available surfaces (in case some are missing)
         available_surfaces = [s for s in surface_colors.keys() if s in all_surfaces]
-
+        
         # Create checkboxes (all unchecked by default)
         selected_surfaces = st.multiselect(
             "Filter by Surface:",
@@ -346,26 +346,39 @@ def render_player_history(history, player_name):
     if selected_surfaces:
         filtered = filtered[filtered['surface'].isin(selected_surfaces)]
 
-    # Create dynamic columns - ALWAYS show winner's odds as Odds 1
+    # Create dynamic columns - ALWAYS show winner as Player 1
     filtered['Player1'] = np.where(filtered['win'] == 1, filtered['player_name'], filtered['opponent'])
     filtered['Player2'] = np.where(filtered['win'] == 1, filtered['opponent'], filtered['player_name'])
     filtered['R1'] = np.where(filtered['win'] == 1, filtered['player_ranking'], filtered['opponent_ranking'])
     filtered['R2'] = np.where(filtered['win'] == 1, filtered['opponent_ranking'], filtered['player_ranking'])
-
-    # ALWAYS show winner's odds as Odds 1
-    filtered['Odds1'] = np.where(filtered['win'] == 1,
-                                filtered['p1_win_match_odds'],
-                                filtered['p2_win_match_odds'])
-
-    # ALWAYS show loser's odds as Odds 2
-    filtered['Odds2'] = np.where(filtered['win'] == 1,
-                                filtered['p2_win_match_odds'],
-                                filtered['p1_win_match_odds'])
-
+    
+    # ALWAYS show winner's odds as Odds 1 and loser's odds as Odds 2
+    # Determine winner's odds based on who was p1
+    filtered['Odds1'] = np.where(
+        (filtered['win'] == 1) & (filtered['player_name'] == filtered['p1_name']),
+        filtered['p1_win_match_odds'],
+        np.where(
+            (filtered['win'] == 1) & (filtered['player_name'] != filtered['p1_name']),
+            filtered['p2_win_match_odds'],
+            np.where(
+                (filtered['win'] == 0) & (filtered['player_name'] == filtered['p1_name']),
+                filtered['p2_win_match_odds'],
+                filtered['p1_win_match_odds']
+            )
+        )
+    )
+    
+    # Loser's odds are always the opposite of winner's odds
+    filtered['Odds2'] = np.where(
+        filtered['Odds1'] == filtered['p1_win_match_odds'],
+        filtered['p2_win_match_odds'],
+        filtered['p1_win_match_odds']
+    )
+    
     # Format columns
     filtered['R1'] = filtered['R1'].astype('Int64').astype(str).replace('<NA>', '')
     filtered['R2'] = filtered['R2'].astype('Int64').astype(str).replace('<NA>', '')
-
+    
     # Format odds to 2 decimal places without extra zeros
     filtered['Odds1'] = filtered['Odds1'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")
     filtered['Odds2'] = filtered['Odds2'].apply(lambda x: f"{x:.2f}" if not pd.isna(x) else "")

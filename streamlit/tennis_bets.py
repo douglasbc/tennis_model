@@ -88,19 +88,33 @@ def load_live_bets(_client):
     df.to_parquet(BETS_CACHE)
     return df
 
+# Update the load_player_roi function to include handicap columns
 def load_player_roi(_client):
     # Check if cache exists and is fresh (last 24 hours)
     if os.path.exists(ROI_CACHE):
         cache_time = datetime.fromtimestamp(os.path.getmtime(ROI_CACHE))
         if datetime.now() - cache_time < timedelta(hours=24):
             cached = pd.read_parquet(ROI_CACHE)
-            # Check if required columns exist
-            required_cols = ['player_name', 'tour', 'overall_match_win_roi',
-                           'hard_match_win_roi', 'clay_match_win_roi', 'grass_match_win_roi',
-                           'indoor_hard_match_win_roi', 'vs_left_handed_match_roi',
-                           'roi_vs_rally1_match', 'roi_vs_rally2_match', 'roi_vs_rally3_match', 'roi_vs_rally4_match',
-                           'roi_vs_net1_match', 'roi_vs_net2_match', 'roi_vs_net3_match', 'roi_vs_net4_match'
-                           'roi_vs_serve1_match', 'roi_vs_serve2_match', 'roi_vs_serve3_match', 'roi_vs_serve4_match', 'roi_vs_serve5_match']
+            # Update required columns to include handicap metrics
+            required_cols = [
+                'player_name', 'tour', 'overall_match_win_roi',
+                'overall_plus_handicap_roi', 'overall_minus_handicap_roi',
+                'hard_match_win_roi', 'clay_match_win_roi', 'grass_match_win_roi',
+                'indoor_hard_match_win_roi', 'vs_left_handed_match_roi',
+                'roi_vs_rally1_match', 'roi_vs_rally2_match', 'roi_vs_rally3_match', 'roi_vs_rally4_match',
+                'roi_vs_net1_match', 'roi_vs_net2_match', 'roi_vs_net3_match', 'roi_vs_net4_match',
+                'roi_vs_serve1_match', 'roi_vs_serve2_match', 'roi_vs_serve3_match', 'roi_vs_serve4_match', 'roi_vs_serve5_match',
+                # Surface-specific handicap ROIs
+                'clay_plus_handicap_roi', 'clay_minus_handicap_roi',
+                'grass_plus_handicap_roi', 'grass_minus_handicap_roi',
+                'hard_plus_handicap_roi', 'hard_minus_handicap_roi',
+                'indoor_hard_plus_handicap_roi', 'indoor_hard_minus_handicap_roi',
+                # Cluster-specific handicap ROIs
+                'roi_vs_rally1_plus_handicap', 'roi_vs_rally1_minus_handicap',
+                'roi_vs_rally2_plus_handicap', 'roi_vs_rally2_minus_handicap',
+                'roi_vs_rally3_plus_handicap', 'roi_vs_rally3_minus_handicap',
+                'roi_vs_rally4_plus_handicap', 'roi_vs_rally4_minus_handicap'
+            ]
             if all(col in cached.columns for col in required_cols):
                 return cached
 
@@ -515,75 +529,105 @@ def render_player_roi(roi_data, player_name, surface, is_left_handed_opponent, o
         st.warning(f"No ROI data available for {player_name}")
         return
 
-    # Display all ROIs with color coding
-    st.markdown(f"**Overall ROI:** {format_roi_with_color(roi_data['overall_match_win_roi'].iloc[0])}",
-                unsafe_allow_html=True)
-
-    # Surface ROI
-    surface_col = get_surface_roi_column(surface)
-    st.markdown(f"**{surface} ROI:** {format_roi_with_color(roi_data[surface_col].iloc[0])}",
-                unsafe_allow_html=True)
-
-    # Check if left-handed status is available and True
-    if not pd.isna(is_left_handed_opponent) and is_left_handed_opponent:
-        st.markdown(f"**vs Left-Handed ROI:** {format_roi_with_color(roi_data['vs_left_handed_match_roi'].iloc[0])}",
-                    unsafe_allow_html=True)
-
-    # Cluster ROIs section
-    st.markdown("**Cluster ROIs vs Opponent:**", unsafe_allow_html=True)
+    # Get surface base name for column lookup
+    surface_map = {
+        "Clay": "clay",
+        "Grass": "grass",
+        "Hard": "hard",
+        "Carpet": "indoor_hard",
+        "Indoor Hard": "indoor_hard"
+    }
+    surface_base = surface_map.get(surface, "hard")
     
-    rally_cluster, net_cluster, serve_cluster = opponent_clusters
+    # Initialize cluster ROI tracking
     total_cluster_roi = 0
     valid_clusters = 0
-    
-    # Always show all 3 cluster types, even if some are missing
     cluster_display = []
+    
+    # Display all ROIs with color coding
+    st.markdown("**Match Win ROIs**", unsafe_allow_html=True)
+    
+    # Helper function to safely get ROI value
+    def get_roi_value(df, col_name):
+        if col_name in df.columns and not pd.isna(df[col_name].iloc[0]):
+            return df[col_name].iloc[0]
+        return None
+    
+    # Match win ROIs
+    st.markdown(f"Overall: {format_roi_with_color(get_roi_value(roi_data, 'overall_match_win_roi'))}",
+                unsafe_allow_html=True)
+    
+    # Surface ROI
+    surface_col = f"{surface_base}_match_win_roi"
+    st.markdown(f"{surface}: {format_roi_with_color(get_roi_value(roi_data, surface_col))}",
+                unsafe_allow_html=True)
+
+    # Left-handed ROI if applicable
+    if not pd.isna(is_left_handed_opponent) and is_left_handed_opponent:
+        st.markdown(f"vs Left-Handed: {format_roi_with_color(get_roi_value(roi_data, 'vs_left_handed_match_roi'))}",
+                    unsafe_allow_html=True)
+                    
+    # Handicap ROIs section
+    st.markdown("**Handicap ROIs**", unsafe_allow_html=True)
+    
+    # Overall handicap ROIs
+    plus_overall = get_roi_value(roi_data, 'overall_plus_handicap_roi')
+    minus_overall = get_roi_value(roi_data, 'overall_minus_handicap_roi')
+    
+    st.markdown(f"Plus Overall: {format_roi_with_color(plus_overall)}",
+                unsafe_allow_html=True)
+    st.markdown(f"Minus Overall: {format_roi_with_color(minus_overall)}",
+                unsafe_allow_html=True)
+    
+    # Surface-specific handicap ROIs
+    plus_surface = get_roi_value(roi_data, f'{surface_base}_plus_handicap_roi')
+    minus_surface = get_roi_value(roi_data, f'{surface_base}_minus_handicap_roi')
+    
+    st.markdown(f"Plus {surface}: {format_roi_with_color(plus_surface)}",
+                unsafe_allow_html=True)
+    st.markdown(f"Minus {surface}: {format_roi_with_color(minus_surface)}",
+                unsafe_allow_html=True)
+
+    # Cluster ROIs section
+    rally_cluster, net_cluster, serve_cluster = opponent_clusters
+    st.markdown("**Cluster ROIs vs Opponent**", unsafe_allow_html=True)
     
     # Rally cluster
     if not pd.isna(rally_cluster):
         col_name = f'roi_vs_rally{int(rally_cluster)}_match'
-        if col_name in roi_data.columns:
-            roi_value = roi_data[col_name].iloc[0]
-            if not pd.isna(roi_value):
-                cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: {format_roi_with_color(roi_value)}")
-                total_cluster_roi += roi_value
-                valid_clusters += 1
-            else:
-                cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: No data")
+        roi_value = get_roi_value(roi_data, col_name)
+        if roi_value is not None:
+            cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: {format_roi_with_color(roi_value)}")
+            total_cluster_roi += roi_value
+            valid_clusters += 1
         else:
-            cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: Column missing")
+            cluster_display.append(f"- Rally Cluster {int(rally_cluster)}: No data")
     else:
         cluster_display.append("- Rally Cluster: Not available")
 
     # Net cluster
     if not pd.isna(net_cluster):
         col_name = f'roi_vs_net{int(net_cluster)}_match'
-        if col_name in roi_data.columns:
-            roi_value = roi_data[col_name].iloc[0]
-            if not pd.isna(roi_value):
-                cluster_display.append(f"- Net Cluster {int(net_cluster)}: {format_roi_with_color(roi_value)}")
-                total_cluster_roi += roi_value
-                valid_clusters += 1
-            else:
-                cluster_display.append(f"- Net Cluster {int(net_cluster)}: No data")
+        roi_value = get_roi_value(roi_data, col_name)
+        if roi_value is not None:
+            cluster_display.append(f"- Net Cluster {int(net_cluster)}: {format_roi_with_color(roi_value)}")
+            total_cluster_roi += roi_value
+            valid_clusters += 1
         else:
-            cluster_display.append(f"- Net Cluster {int(net_cluster)}: Column missing")
+            cluster_display.append(f"- Net Cluster {int(net_cluster)}: No data")
     else:
         cluster_display.append("- Net Cluster: Not available")
 
     # Serve cluster
     if not pd.isna(serve_cluster):
         col_name = f'roi_vs_serve{int(serve_cluster)}_match'
-        if col_name in roi_data.columns:
-            roi_value = roi_data[col_name].iloc[0]
-            if not pd.isna(roi_value):
-                cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: {format_roi_with_color(roi_value)}")
-                total_cluster_roi += roi_value
-                valid_clusters += 1
-            else:
-                cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: No data")
+        roi_value = get_roi_value(roi_data, col_name)
+        if roi_value is not None:
+            cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: {format_roi_with_color(roi_value)}")
+            total_cluster_roi += roi_value
+            valid_clusters += 1
         else:
-            cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: Column missing")
+            cluster_display.append(f"- Serve Cluster {int(serve_cluster)}: No data")
     else:
         cluster_display.append("- Serve Cluster: Not available")
 
@@ -597,6 +641,24 @@ def render_player_roi(roi_data, player_name, surface, is_left_handed_opponent, o
                     unsafe_allow_html=True)
     else:
         st.markdown("**Total Cluster ROI:** No valid cluster data available")
+
+    # Handicap Cluster ROIs
+    if not pd.isna(rally_cluster):
+        st.markdown("**Handicap Cluster ROIs vs Opponent**", unsafe_allow_html=True)
+        
+        # Plus handicap cluster ROI
+        plus_col = f'roi_vs_rally{int(rally_cluster)}_plus_handicap'
+        plus_roi = get_roi_value(roi_data, plus_col)
+        if plus_roi is not None:
+            st.markdown(f"Plus Handicap vs Rally {int(rally_cluster)}: {format_roi_with_color(plus_roi)}",
+                        unsafe_allow_html=True)
+        
+        # Minus handicap cluster ROI
+        minus_col = f'roi_vs_rally{int(rally_cluster)}_minus_handicap'
+        minus_roi = get_roi_value(roi_data, minus_col)
+        if minus_roi is not None:
+            st.markdown(f"Minus Handicap vs Rally {int(rally_cluster)}: {format_roi_with_color(minus_roi)}",
+                        unsafe_allow_html=True)
 
 def render_head_to_head(h2h_df, player1, player2):
     if h2h_df.empty:
