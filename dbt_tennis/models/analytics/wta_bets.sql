@@ -301,4 +301,4 @@ select
   round(p2_home_roi, 2) as p2_home_roi
 
 from roi_enhancements
-where left(tournament_name, 3) <> 'W15'
+-- where left(tournament_name, 3) <> 'W15'
