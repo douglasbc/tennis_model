@@ -42,6 +42,7 @@ not_newbies as (
 
 final as (
   select
+    match_id,
     match_date,
     p1_name,
     p2_name,

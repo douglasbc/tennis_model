@@ -15,7 +15,7 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 }
-TOURNAMENT_PREFIXES = ['ATP - SINGLES']
+TOURNAMENT_PREFIXES = ['ATP - SINGLES', 'CHALLENGER MEN - SINGLES']
 REQUEST_DELAY = 2
 
 def get_player_profile(url):
@@ -296,7 +296,8 @@ if __name__ == "__main__":
     # To scrape yesterday's matches
     update_stats_dataset(days_ago=1)
     
-    # To scrape multiple days
-    # for days in range(4,0):
+    # # To scrape multiple days
+    # for days in range(5, 0, -1):
     #     update_stats_dataset(days_ago=days)
     #     time.sleep(10)
+

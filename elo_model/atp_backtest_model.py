@@ -10,16 +10,16 @@ from jax_elo.utils.convert_p import convert_bo3_p_to_bo5
 from google.cloud.bigquery import LoadJobConfig
 
 input_start = '"2014-01-01"'
-input_end = '"2022-03-31"'
-test_end = '"2022-07-31"'
-year_start = '2014_to_2022_april_to_july'
+input_end = '"2025-03-31"'
+test_end = '"2025-07-31"'
+year_start = '2014_to_2025_april_to_july'
 
 
 client = bigquery_client()
 
 def get_input_data(tour):
     input_query = f'''
-                     select * from `tennis-358702.model_layer.{tour}_input`
+                     select * from `tennis-358702.model.{tour}_model_input`
                      where match_date >= {input_start}
                      and match_date <= {input_end}
                     '''
@@ -53,14 +53,14 @@ def get_test_matches(tour):
 
                             players_fitted as (
                               select distinct p1_name as player
-                              from `tennis-358702.model_layer.{tour}_input`
+                              from `tennis-358702.model.{tour}_model_input`
                               where match_date <= {input_end}
                               union all
                               select distinct p2_name as player
-                              from `tennis-358702.model_layer.{tour}_input`
+                              from `tennis-358702.model.{tour}_model_input`
                               where match_date <= {input_end}
                             )
-                            select * from `tennis-358702.model_layer.{tour}_input`
+                            select * from `tennis-358702.model.{tour}_model_input`
                             where
                               match_date > {input_end}
                               and match_date <= {test_end}
@@ -96,7 +96,7 @@ def predict_test_matches(tour, year_start, final_rating_dict, params, mark_names
         df.loc[index,'p1_pct_diff'] = match_prediction - df.loc[index,'p1_odds_pct']
         df.loc[index,'p2_pct_diff'] = 1-match_prediction - df.loc[index,'p2_odds_pct'] 
 
-    table_id = f'tennis-358702.model_layer.{tour}_{year_start}_backtest_predictions'
+    table_id = f'tennis-358702.model.{tour}_{year_start}_backtest_predictions'
 
     job_config = LoadJobConfig(write_disposition='WRITE_TRUNCATE')
 
@@ -116,4 +116,4 @@ def main(tour):
 
 
 if __name__ == "__main__":
-    main('wta')
+    main('atp')

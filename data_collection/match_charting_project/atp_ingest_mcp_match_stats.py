@@ -1,0 +1,135 @@
+import os
+import pandas as pd
+from google.cloud import bigquery
+from google.oauth2 import service_account
+from typing import List
+from bq_client import bigquery_client
+
+
+PROJECT_ID = 'tennis-358702'
+DATASET = 'raw_layer'
+CSV_PATH = os.path.join('data_collection', 'match_charting_project', 'tennis_MatchChartingProject-master')
+
+
+def process_file1(file_name: str) -> pd.DataFrame:
+    """Process the first CSV file to prepare for BigQuery ingestion."""
+    df = pd.read_csv(os.path.join(CSV_PATH, file_name))
+    df = df[df['set'] == 'Total']
+
+    # Split match_id into components with error handling
+    split_cols = ['match_date', 'tour', 'tournament_name', 'round', 'p1_name', 'p2_name']
+
+    # Split with max 5 splits to get 6 parts, pad with None if fewer
+    split_data = df['match_id'].str.split('-', n=5, expand=True)
+
+    # Ensure we have exactly 6 columns
+    if split_data.shape[1] < len(split_cols):
+        # Add missing columns filled with None
+        for i in range(split_data.shape[1], len(split_cols)):
+            split_data[i] = None
+
+    # Assign to DataFrame
+    df[split_cols] = split_data.iloc[:, :len(split_cols)]
+
+    # Convert match_date to date (handle errors)
+    df['match_date'] = pd.to_datetime(df['match_date'], format='%Y%m%d', errors='coerce').dt.date
+
+    # Replace underscores in specific columns
+    for col in ['tournament_name', 'p1_name', 'p2_name']:
+        df[col] = df[col].str.replace('_', ' ', regex=False)
+
+    # Split into player 1 and player 2 data
+    df_p1 = df[df['player'] == df['p1_name']].copy()
+    df_p2 = df[df['player'] == df['p2_name']].copy()
+
+    # Columns to rename (excluding split columns and identifiers)
+    stats_cols = df.columns.difference(['match_id', 'player', 'set'] + split_cols).tolist()
+
+    # Rename stats columns with prefixes
+    df_p1.rename(columns={col: f'p1_{col}' for col in stats_cols}, inplace=True)
+    df_p2.rename(columns={col: f'p2_{col}' for col in stats_cols}, inplace=True)
+
+    # Merge player 1 and player 2 data
+    merged_df = pd.merge(
+        df_p1[['match_id'] + split_cols + [f'p1_{col}' for col in stats_cols]],
+        df_p2[['match_id'] + [f'p2_{col}' for col in stats_cols]],
+        on='match_id'
+    )
+    return merged_df
+
+def process_file2(file_name: str, merged_df1: pd.DataFrame) -> pd.DataFrame:
+    """Process the second CSV file and join with processed File1 data."""
+    df = pd.read_csv(os.path.join(CSV_PATH, file_name))
+    df = df[df['row'] == 'NetPoints']
+    df = df[['match_id', 'player', 'net_pts', 'pts_won']]
+
+    # Merge with File1 data to get p1_name and p2_name
+    df_merged = df.merge(
+        merged_df1[['match_id', 'p1_name', 'p2_name']],
+        on='match_id',
+        how='inner'
+    )
+
+    # Create p1 and p2 specific columns
+    df_merged['p1_net_pts'] = df_merged.apply(
+        lambda x: x['net_pts'] if x['player'] == x['p1_name'] else None,
+        axis=1
+    )
+    df_merged['p1_net_pts_won'] = df_merged.apply(
+        lambda x: x['pts_won'] if x['player'] == x['p1_name'] else None,
+        axis=1
+    )
+    df_merged['p2_net_pts'] = df_merged.apply(
+        lambda x: x['net_pts'] if x['player'] == x['p2_name'] else None,
+        axis=1
+    )
+    df_merged['p2_net_pts_won'] = df_merged.apply(
+        lambda x: x['pts_won'] if x['player'] == x['p2_name'] else None,
+        axis=1
+    )
+
+    # Aggregate to one row per match_id
+    df_grouped = df_merged.groupby('match_id').agg({
+        'p1_net_pts': 'first',
+        'p1_net_pts_won': 'first',
+        'p2_net_pts': 'first',
+        'p2_net_pts_won': 'first'
+    }).reset_index()
+    return df_grouped
+
+def main():
+    merged_df1 = process_file1('charting-m-stats-Overview.csv')
+    df2_grouped = process_file2('charting-m-stats-NetPoints.csv', merged_df1)
+
+    # Merge to final DataFrame
+    final_df = merged_df1.merge(df2_grouped, on='match_id', how='left')
+
+    # Define BigQuery schema
+    schema = [
+        bigquery.SchemaField('match_date', 'DATE', mode='REQUIRED'),
+        bigquery.SchemaField('tour', 'STRING'),
+        bigquery.SchemaField('tournament_name', 'STRING'),
+        bigquery.SchemaField('round', 'STRING'),
+        bigquery.SchemaField('p1_name', 'STRING', mode='REQUIRED'),
+        bigquery.SchemaField('p2_name', 'STRING', mode='REQUIRED')
+    ]
+
+    # Add other columns (assuming all other fields are INTEGER)
+    numeric_cols = final_df.columns.difference([
+        'match_id', 'match_date', 'tour', 'tournament_name', 'round', 'p1_name', 'p2_name'
+    ])
+    for col in numeric_cols:
+        schema.append(bigquery.SchemaField(col, 'INT64'))
+
+    # Upload to BigQuery
+    client = bigquery_client()
+    table_name = 'atp_match_charting_repo_stats'
+    table_id = f"{PROJECT_ID}.{DATASET}.{table_name}"
+
+    job_config = bigquery.LoadJobConfig(schema=schema, write_disposition = 'WRITE_TRUNCATE')
+    job = client.load_table_from_dataframe(final_df, table_id, job_config=job_config)
+    job.result()
+    print(f"Loaded {job.output_rows} rows into {table_id}")
+
+if __name__ == '__main__':
+    main()

@@ -4,6 +4,12 @@ data/
 tennis_data_cache/
 odds_api/
 
+# Stats Scraping
+data_collection/flashscore/scrape_flashscore_stats.py
+
+# CSV files
+*.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

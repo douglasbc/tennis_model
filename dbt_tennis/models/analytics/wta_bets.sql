@@ -25,7 +25,7 @@ pinnacle_odds as (
     left join fix_player_names as f1 on p.p1_name = f1.pinnacle_name
     left join fix_player_names as f2 on p.p2_name = f2.pinnacle_name
   where resulting_unit = 'Sets'
-    and event_type = 'prematch'
+    -- and event_type = 'prematch'
     and p1_pinnacle_odds is not null
     and tournament_round not like '%Doubles%'
 ),
