@@ -30,8 +30,8 @@ pinnacle_odds as (
     and tournament_round not like '%Doubles%'
 ),
 
-atp_predictions as (
-  select * from {{ source('raw_layer', 'atp_predictions') }}
+atp_today (
+  select * from {{ ref('atp_today') }}
 ),
 
 atp_serve_dependency_clusters as (
@@ -52,10 +52,6 @@ atp_roi as (
 
 atp_players as (
   select * from {{ ref('atp_players') }}
-),
-
-atp_matches_count as (
-  select * from {{ ref('atp_matches_count') }}
 ),
 
 clusters as (
@@ -116,23 +112,17 @@ base_matches as (
   select
     po.event_id,
     po.tournament_round,
-    ap.tournament_tier,
-    ap.surface,
+    t.tournament_tier,
+    t.surface,
     datetime_sub(po.match_start_at, interval 3 hour) as match_start_at,
     po.p1_name,
     po.p2_name,
     po.p1_pinnacle_odds,
-    po.p2_pinnacle_odds,
-    1/po.p1_pinnacle_odds as p1_implied_prob,
-    1/po.p2_pinnacle_odds as p2_implied_prob,
-    ap.p1_probability as p1_model_prob,
-    ap.p2_probability as p2_model_prob,
-    ap.p1_fair_odds as p1_model_odds,
-    ap.p2_fair_odds as p2_model_odds
+    po.p2_pinnacle_odds
   from pinnacle_odds po
-  left join atp_predictions ap
-    on po.p1_name = ap.p1_name
-    and po.p2_name = ap.p2_name
+  left join atp_today t
+    on po.p1_name = t.p1_name
+    and po.p2_name = t.p2_name
 ),
 
 match_clusters as (
@@ -253,19 +243,6 @@ select
   p2_name,
   p1_is_left_handed,
   p2_is_left_handed,
-  100*greatest(
-        p1_model_prob - p1_implied_prob,
-        p2_model_prob - p2_implied_prob
-        ) as diff,
-  round(p1_pinnacle_odds, 2) as p1_pinnacle_odds,
-  round(p2_pinnacle_odds, 2) as p2_pinnacle_odds,
-  p1_implied_prob,
-  p2_implied_prob,
-  p1_model_prob,
-  p2_model_prob,
-  round(p1_model_odds, 2) as p1_model_odds,
-  round(p2_model_odds, 2) as p2_model_odds,
-
 --   -- Cluster information
   p1_rally_cluster,
   p1_net_cluster,

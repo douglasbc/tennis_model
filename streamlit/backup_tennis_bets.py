@@ -10,7 +10,7 @@ from google.oauth2 import service_account
 # --------------------------
 # CACHE CONFIGURATION
 # --------------------------
-CACHE_DIR = "tennis_data_cache"
+CACHE_DIR = os.path.join('streamlit', 'tennis_data_cache')
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 # Cache file paths

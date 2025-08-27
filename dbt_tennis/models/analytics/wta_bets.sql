@@ -25,13 +25,13 @@ pinnacle_odds as (
     left join fix_player_names as f1 on p.p1_name = f1.pinnacle_name
     left join fix_player_names as f2 on p.p2_name = f2.pinnacle_name
   where resulting_unit = 'Sets'
-    -- and event_type = 'prematch'
+    and event_type = 'prematch'
     and p1_pinnacle_odds is not null
     and tournament_round not like '%Doubles%'
 ),
 
-wta_predictions as (
-  select * from {{ source('raw_layer', 'wta_predictions') }}
+wta_today (
+  select * from {{ ref('wta_today') }}
 ),
 
 wta_serve_dependency_clusters as (
@@ -52,10 +52,6 @@ wta_roi as (
 
 wta_players as (
   select * from {{ ref('wta_players') }}
-),
-
-wta_matches_count as (
-  select * from {{ ref('wta_matches_count') }}
 ),
 
 clusters as (
@@ -114,24 +110,17 @@ base_matches as (
   select
     po.event_id,
     po.tournament_round,
-    ap.tournament_name,
-    ap.tournament_tier,
-    ap.surface,
+    t.tournament_tier,
+    t.surface,
     datetime_sub(po.match_start_at, interval 3 hour) as match_start_at,
     po.p1_name,
     po.p2_name,
     po.p1_pinnacle_odds,
-    po.p2_pinnacle_odds,
-    1/po.p1_pinnacle_odds as p1_implied_prob,
-    1/po.p2_pinnacle_odds as p2_implied_prob,
-    ap.p1_probability as p1_model_prob,
-    ap.p2_probability as p2_model_prob,
-    ap.p1_fair_odds as p1_model_odds,
-    ap.p2_fair_odds as p2_model_odds
+    po.p2_pinnacle_odds
   from pinnacle_odds po
-  left join wta_predictions ap
-    on po.p1_name = ap.p1_name
-    and po.p2_name = ap.p2_name
+  left join wta_today t
+    on po.p1_name = t.p1_name
+    and po.p2_name = t.p2_name
 ),
 
 match_clusters as (
@@ -248,19 +237,6 @@ select
   p2_name,
   p1_is_left_handed,
   p2_is_left_handed,
-  100*greatest(
-        p1_model_prob - p1_implied_prob,
-        p2_model_prob - p2_implied_prob
-        ) as diff,
-  round(p1_pinnacle_odds, 2) as p1_pinnacle_odds,
-  round(p2_pinnacle_odds, 2) as p2_pinnacle_odds,
-  p1_implied_prob,
-  p2_implied_prob,
-  p1_model_prob,
-  p2_model_prob,
-  round(p1_model_odds, 2) as p1_model_odds,
-  round(p2_model_odds, 2) as p2_model_odds,
-
 --   -- Cluster information
   p1_rally_cluster,
   p1_net_cluster,
@@ -301,4 +277,3 @@ select
   round(p2_home_roi, 2) as p2_home_roi
 
 from roi_enhancements
--- where left(tournament_name, 3) <> 'W15'

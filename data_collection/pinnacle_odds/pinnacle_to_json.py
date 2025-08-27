@@ -13,7 +13,7 @@ def export_odds_to_json():
 	json_data = requests.request("GET", URL, headers=HEADERS, params=QUERY_STRING).json()
 	json_data = json_data['events']
 
-	with open('odds_api/tennis_odds.json', 'w') as json_file:
+	with open('data_collection/pinnacle_odds/tennis_odds.json', 'w') as json_file:
 		json.dump(json_data, json_file, indent=2)
 
 

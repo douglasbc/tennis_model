@@ -19,7 +19,6 @@ sources:
       - name: atp_match_charting_repo_stats
       - name: flashscore_stats_scraped
       - name: flashscore_stats_manual
-      - name: atp_predictions
       - name: atp_serve_dependency_clusters
       - name: atp_rally_aggression_clusters
       - name: atp_net_points_clusters
@@ -32,7 +31,6 @@ sources:
       - name: today_wta
       - name: tournaments_wta
       - name: wta_match_charting_repo_stats
-      - name: wta_predictions
       - name: wta_serve_dependency_clusters
       - name: wta_rally_aggression_clusters
       - name: wta_net_points_clusters

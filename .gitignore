@@ -1,11 +1,12 @@
 # Project folders
 config/
 data/
-tennis_data_cache/
+streamlit/tennis_data_cache/
 odds_api/
 
 # Stats Scraping
-data_collection/flashscore/scrape_flashscore_stats.py
+/data_collection/flashscore/flashscore_atp_stats.csv
+/data_collection/flashscore/scrape_flashscore_stats.py
 
 # CSV files
 *.csv

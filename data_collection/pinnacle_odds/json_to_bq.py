@@ -9,7 +9,7 @@ from bq_client import bigquery_client
 
         
 def load_json_as_df():
-    with open('odds_api/tennis_odds.json', 'r') as f:
+    with open('data_collection/pinnacle_odds/tennis_odds.json', 'r') as f:
       odds_data = json.load(f)
       odds_data = odds_data[4:]
 
