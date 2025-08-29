@@ -1,61 +1,16 @@
 {{ config(
     materialized = 'table',
-    schema = 'silver',
-    partition_by = {
-      "field": "match_date",
-      "data_type": "date",
-      "granularity": "day"
-    }
+    schema = 'silver'
 )}}
 
 with 
 
-matches_atp as (
-  select
-    to_hex(md5(concat(player_1_id, player_2_id, tournament_id, round_id))) as match_id,
-    *
-  from {{ source('raw_layer', 'matches_atp') }}
+atp_matches as (
+  select * from {{ ref('atp_matches') }}}
 ),
 
-atp_players as (
-  select * from {{ ref('atp_players') }}
-),
 
-atp_tournaments as (
-  select * from {{ ref('atp_tournaments') }}
-),
 
-atp_stats as (
-  select * from {{ ref('atp_stats') }}
-),
-
-atp_odds as (
-  select * from {{ ref('atp_odds') }}
-),
-
-atp_rankings as (
-  select * from {{ ref('atp_rankings') }}
-),
-
-rounds as (
-  select * from {{ source('raw_layer', 'rounds') }}
-),
-
-rankings_atp as (
-  select * from {{ source('raw_layer', 'rankings_atp') }}
-),
-
-atp_serve_dependency_clusters as (
-  select * from {{ source('raw_layer', 'atp_serve_dependency_clusters') }}
-),
-
-atp_rally_aggression_clusters as (
-  select * from {{ source('raw_layer', 'atp_rally_aggression_clusters') }}
-),
-
-atp_net_points_clusters as (
-  select * from {{ source('raw_layer', 'atp_net_points_clusters') }}
-),
 
 final as (
     select
@@ -105,16 +60,16 @@ final as (
       s.p2_return_points_played,
       s.p2_return_points_won,
 --       s.match_duration_minutes,
-      o.p1_win_match_odds,
-      o.p2_win_match_odds,
+      coalesce(o1.p1_win_match_odds, o2.p2_win_match_odds) as p1_win_match_odds,
+      coalesce(o1.p2_win_match_odds, o2.p1_win_match_odds) as p2_win_match_odds,
 --       o.total_line,
 --       o.under_odds,
 --       o.over_odds,
-      o.p1_handicap_line,
+      coalesce(o1.p1_handicap_line, o2.p2_handicap_line) as p1_handicap_line,
 --       safe_multiply(o.p1_handicap_line, -1) as p2_handicap_line,
-      o.p2_handicap_line,
-      o.p1_handicap_odds,
-      o.p2_handicap_odds,
+      coalesce(o1.p2_handicap_line, o2.p1_handicap_line) as p2_handicap_line,
+      coalesce(o1.p1_handicap_odds, o2.p2_handicap_odds) as p1_handicap_odds,
+      coalesce(o1.p2_handicap_odds, o2.p1_handicap_odds) as p2_handicap_odds,
       cs1.best_cluster as p1_serve_dependency_cluster,
       cs2.best_cluster as p2_serve_dependency_cluster,
       cr1.best_cluster as p1_rally_aggression_cluster,
@@ -129,7 +84,9 @@ final as (
 --       left join atp_entry as e1 on (m.player_1_id = e1.player_id and m.tournament_id = e1.tournament_id)
 --       left join atp_entry as e2 on (m.player_2_id = e2.player_id and m.tournament_id = e2.tournament_id)
       left join atp_stats as s on m.match_id = s.match_id
-      left join atp_odds as o on m.match_id = o.match_id
+--       left join atp_odds as o on m.match_id = o.match_id
+      left join atp_odds as o1 on m.match_id = o1.match_id_1
+      left join atp_odds as o2 on m.match_id = o2.match_id_2
       left join atp_rankings as r1 on m.player_1_id = r1.player_id
         and m.match_date between r1.ranking_date and date_add(r1.ranking_date, interval 6 day)
       left join atp_rankings as r2 on m.player_2_id = r2.player_id

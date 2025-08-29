@@ -18,6 +18,9 @@ with atp_matches as (
         and match_date >= '2021-01-01'
         and p1_win_match_odds is not null
         and p2_win_match_odds is not null
+        and (p1_name = 'Marin Cilic' or p2_name = 'Marin Cilic')
+        and match_date in ('2024-11-03', '2024-11-04', '2024-11-05', '2024-11-06')
+
 ),
 
 match_data as (
@@ -86,7 +89,6 @@ handicap_calculations as (
         case
             when (games_won + handicap_line) > games_against then handicap_odds - 1  -- Win
             when (games_won + handicap_line) < games_against then -1                 -- Loss
-            else 0                                                                   -- Push (draw)
         end as handicap_profit,
         case when tournament_tier = 'Grand Slam' then 1 else 0 end as is_grand_slam,
         case when player_country = tournament_country then 1 else 0 end as is_home_country
@@ -94,6 +96,7 @@ handicap_calculations as (
     where 
         handicap_line is not null 
         and handicap_odds is not null
+        and (games_won + handicap_line) <> 0
 ),
 
 bet_calculations as (

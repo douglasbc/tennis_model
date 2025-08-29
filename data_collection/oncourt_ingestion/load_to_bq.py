@@ -15,8 +15,8 @@ client = bigquery_client()
 
 class TennisTable():
 
-    BACKUP_PATH = os.path.join('data', 'backup')
-    CSV_PATH = os.path.join('data', 'csv')
+    BACKUP_PATH = os.path.join('data_collection', 'oncourt_ingestion', 'data', 'backup')
+    CSV_PATH = os.path.join('data_collection', 'oncourt_ingestion', 'data', 'csv')
     DATASET = 'raw_layer'
     PROJECT_ID = 'tennis-358702'
 

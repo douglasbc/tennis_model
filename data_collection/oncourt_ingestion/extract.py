@@ -3,8 +3,8 @@ import shutil
 import subprocess
 
 
-BACKUP_PATH = os.path.join('data', 'backup')
-CSV_PATH = os.path.join('data', 'csv')
+BACKUP_PATH = os.path.join('data_collection', 'oncourt_ingestion', 'data', 'backup')
+CSV_PATH = os.path.join('data_collection', 'oncourt_ingestion', 'data', 'csv')
 # MDB_PATH = os.path.join('data', 'OnCourt', 'OnCourt.mdb')
 MDB_PATH = os.path.join('~', '.wine32', 'drive_c', 'Program\\ Files',
                         'OnCourt', 'OnCourt.mdb')

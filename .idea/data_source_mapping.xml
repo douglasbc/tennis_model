@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourcePerFileMappings">
+    <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/63246524-49bd-4d2d-8c9f-ef6408d5e931/console_10.sql" value="63246524-49bd-4d2d-8c9f-ef6408d5e931" />
     <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/63246524-49bd-4d2d-8c9f-ef6408d5e931/console_8.sql" value="63246524-49bd-4d2d-8c9f-ef6408d5e931" />
+    <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/63246524-49bd-4d2d-8c9f-ef6408d5e931/console_9.sql" value="63246524-49bd-4d2d-8c9f-ef6408d5e931" />
+    <file url="file://$PROJECT_DIR$/config/misc/buffer/checks/new_match_charting_repo_name.sql" value="63246524-49bd-4d2d-8c9f-ef6408d5e931" />
   </component>
 </project>

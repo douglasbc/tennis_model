@@ -1,6 +1,7 @@
 import json
 from typing import Dict
-
+import os
+import glob
 
 from google.cloud import bigquery
 import pandas as pd
@@ -9,15 +10,26 @@ from bq_client import bigquery_client
 
         
 def load_json_as_df():
-    with open('data_collection/pinnacle_odds/tennis_odds.json', 'r') as f:
-      odds_data = json.load(f)
-      odds_data = odds_data[4:]
+    # Get all tennis_odds JSON files with timestamps
+    json_files = glob.glob('data_collection/pinnacle_odds/json_data/tennis_odds_*.json')
+    
+    if not json_files:
+        raise FileNotFoundError("No tennis odds JSON files found")
+    
+    # Sort files by name (which includes timestamp) and get the most recent
+    latest_file = sorted(json_files)[-1]
+    
+    print(f"Loading data from: {latest_file}")
+    
+    with open(latest_file, 'r') as f:
+        odds_data = json.load(f)
+        odds_data = odds_data[4:]
 
     return pd.json_normalize(odds_data)
 
 
 def load_odds_to_bq(client, df):
-    table_id = f'tennis-358702.raw_layer.pinnacle_odds'
+    table_id = f'tennis-358702.raw_layer.pinnacle_latest_odds'
 
     columns = ['event_id', 'parent_id', 'league_name',
                'starts', 'home', 'away', 

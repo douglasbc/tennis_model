@@ -1,5 +1,6 @@
 import json
 import requests
+from datetime import datetime, timezone
 
 URL = "https://pinnacle-odds.p.rapidapi.com/kit/v1/markets"
 QUERY_STRING = {"sport_id":"2","is_have_odds":"true"}
@@ -10,10 +11,17 @@ HEADERS = {
 
 
 def export_odds_to_json():
+	# Get current timestamp in UTC (timezone-aware)
+	current_timestamp = datetime.now(timezone.utc)
+	
 	json_data = requests.request("GET", URL, headers=HEADERS, params=QUERY_STRING).json()
 	json_data = json_data['events']
+	
+	# Format timestamp as YYYY-MM-DD-HHMMSS
+	formatted_timestamp = current_timestamp.strftime('%Y-%m-%d-%H%M%S')
+	filename = f'data_collection/pinnacle_odds/json_data/tennis_odds_{formatted_timestamp}.json'
 
-	with open('data_collection/pinnacle_odds/tennis_odds.json', 'w') as json_file:
+	with open(filename, 'w') as json_file:
 		json.dump(json_data, json_file, indent=2)
 
 

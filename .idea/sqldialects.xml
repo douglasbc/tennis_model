@@ -45,6 +45,7 @@
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/analytics/streamlit_matches.sql" dialect="BigQuery" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/analytics/streamlit_player_roi.sql" dialect="BigQuery" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/model/atp_clustering_input.sql" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_handicap_roi.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_matches.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_odds.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_players.sql" dialect="GenericSQL" />
@@ -52,6 +53,8 @@
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_stats.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_today.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/dbt_tennis/models/silver/atp_tournaments.sql" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/dbt_tennis/tests/new_mcp_atp_player.sql" dialect="BigQuery" />
+    <file url="file://$PROJECT_DIR$/dbt_tennis/tests/new_mcp_wta_player.sql" dialect="BigQuery" />
     <file url="PROJECT" dialect="BigQuery" />
   </component>
 </project>
