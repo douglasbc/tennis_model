@@ -18,3 +18,12 @@ pandas
 # streamlit
 #seaborn
 # db_dtypes
+
+# Oracle Cloud Infrastructure SDK
+oci>=2.126.0
+
+# HTTP requests library
+requests>=2.31.0
+
+# For additional logging capabilities (optional)
+logging>=0.4.9.6
