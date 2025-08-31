@@ -18,10 +18,8 @@ pinnacle_odds as (
     coalesce(f1.oncourt_name, p1_name) as p1_name,
     coalesce(f2.oncourt_name, p2_name) as p2_name,
     p1_pinnacle_odds,
-    p2_pinnacle_odds,
-    1/p1_pinnacle_odds as p1_pinnacle_odds_p,
-    1/p2_pinnacle_odds as p2_pinnacle_odds_p,
-  from {{ source('raw_layer', 'pinnacle_odds') }} as p
+    p2_pinnacle_odds
+  from {{ source('raw_layer', 'pinnacle_latest_odds') }} as p
     left join fix_player_names as f1 on p.p1_name = f1.pinnacle_name
     left join fix_player_names as f2 on p.p2_name = f2.pinnacle_name
   where resulting_unit = 'Sets'
@@ -30,7 +28,7 @@ pinnacle_odds as (
     and tournament_round not like '%Doubles%'
 ),
 
-wta_today (
+wta_today as (
   select * from {{ ref('wta_today') }}
 ),
 
@@ -274,6 +272,10 @@ select
   round(p1_grand_slam_roi, 2) as p1_grand_slam_roi,
   round(p2_grand_slam_roi, 2) as p2_grand_slam_roi,
   round(p1_home_roi, 2) as p1_home_roi,
-  round(p2_home_roi, 2) as p2_home_roi
-
+  round(p2_home_roi, 2) as p2_home_roi,
+  p1_pinnacle_odds,
+  p2_pinnacle_odds,
+  cast(null as FLOAT64) as p1_model_odds,
+  cast(null as FLOAT64) as p2_model_odds
+  
 from roi_enhancements

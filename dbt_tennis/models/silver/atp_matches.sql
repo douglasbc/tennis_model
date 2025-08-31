@@ -105,16 +105,16 @@ final as (
       s.p2_return_points_played,
       s.p2_return_points_won,
 --       s.match_duration_minutes,
-      o.p1_win_match_odds,
-      o.p2_win_match_odds,
+      coalesce(o1.p1_win_match_odds, o2.p2_win_match_odds) as p1_win_match_odds,
+      coalesce(o1.p2_win_match_odds, o2.p1_win_match_odds) as p2_win_match_odds,
 --       o.total_line,
 --       o.under_odds,
 --       o.over_odds,
-      o.p1_handicap_line,
+      coalesce(o1.p1_handicap_line, o2.p2_handicap_line) as p1_handicap_line,
 --       safe_multiply(o.p1_handicap_line, -1) as p2_handicap_line,
-      o.p2_handicap_line,
-      o.p1_handicap_odds,
-      o.p2_handicap_odds,
+      coalesce(o1.p2_handicap_line, o2.p1_handicap_line) as p2_handicap_line,
+      coalesce(o1.p1_handicap_odds, o2.p2_handicap_odds) as p1_handicap_odds,
+      coalesce(o1.p2_handicap_odds, o2.p1_handicap_odds) as p2_handicap_odds,
       cs1.best_cluster as p1_serve_dependency_cluster,
       cs2.best_cluster as p2_serve_dependency_cluster,
       cr1.best_cluster as p1_rally_aggression_cluster,
@@ -129,7 +129,8 @@ final as (
 --       left join atp_entry as e1 on (m.player_1_id = e1.player_id and m.tournament_id = e1.tournament_id)
 --       left join atp_entry as e2 on (m.player_2_id = e2.player_id and m.tournament_id = e2.tournament_id)
       left join atp_stats as s on m.match_id = s.match_id
-      left join atp_odds as o on m.match_id = o.match_id
+      left join atp_odds as o1 on m.match_id = o1.match_id_1
+      left join atp_odds as o2 on m.match_id = o2.match_id_2
       left join atp_rankings as r1 on m.player_1_id = r1.player_id
         and m.match_date between r1.ranking_date and date_add(r1.ranking_date, interval 6 day)
       left join atp_rankings as r2 on m.player_2_id = r2.player_id

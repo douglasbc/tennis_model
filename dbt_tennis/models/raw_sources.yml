@@ -14,6 +14,7 @@ sources:
       - name: courts
       - name: rounds
       - name: pinnacle_odds
+      - name: pinnacle_latest_odds
       - name: fix_player_names
       - name: fix_flashscore_scraping_player_names
       - name: atp_match_charting_repo_stats
